@@ -1,0 +1,5 @@
+ALTER TABLE "Product"
+    ADD COLUMN "description" VARCHAR(1000);
+
+ALTER TABLE "WarehouseLocation"
+    ADD COLUMN "updatedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;

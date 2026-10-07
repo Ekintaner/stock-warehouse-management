@@ -1,0 +1,41 @@
+{
+  "name": "local-stock-warehouse",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.14.0 <25"
+  },
+  "workspaces": [
+    "apps/web",
+    "apps/api"
+  ],
+  "scripts": {
+    "postinstall": "npm run db:generate",
+    "dev": "node scripts/dev.mjs",
+    "build": "npm run build --workspace=apps/web && npm run build --workspace=apps/api",
+    "typecheck": "npm run typecheck --workspace=apps/web && npm run typecheck --workspace=apps/api",
+    "lint": "eslint .",
+    "test": "npm run test --workspace=apps/api",
+    "auth:create-admin": "node --env-file-if-exists=.env --import tsx apps/api/src/modules/auth/create-admin.ts",
+    "test:db": "node --env-file-if-exists=.env --import tsx --test apps/api/src/database/postgres.integration.test.ts apps/api/src/modules/auth/initial-admin.integration.test.ts apps/api/src/modules/catalog/catalog.integration.test.ts apps/api/src/modules/inventory/stock-routes.integration.test.ts apps/api/src/modules/inventory/transfer-routes.integration.test.ts apps/api/src/modules/inventory/count-routes.integration.test.ts",
+    "db:validate": "prisma validate --config apps/api/prisma.config.ts",
+    "db:generate": "prisma generate --config apps/api/prisma.config.ts",
+    "db:migrate": "tsx apps/api/prisma/verify-database.ts migrate && prisma migrate deploy --config apps/api/prisma.config.ts",
+    "db:seed": "tsx apps/api/prisma/verify-database.ts seed && prisma db seed --config apps/api/prisma.config.ts",
+    "db:test:migrate": "tsx apps/api/prisma/verify-database.ts test-migrate && prisma migrate deploy --config apps/api/prisma.test.config.ts",
+    "db:grants": "tsx apps/api/prisma/verify-database.ts grants && tsx apps/api/prisma/verify-database.ts test-grants && tsx apps/api/prisma/apply-database-grants.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.19.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "eslint": "10.12.0",
+    "globals": "17.13.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.1",
+    "vite": "8.3.2"
+  }
+}

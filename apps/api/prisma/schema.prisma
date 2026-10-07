@@ -1,0 +1,454 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  WAREHOUSE_MANAGER
+  VIEWER
+}
+
+enum Unit {
+  EACH
+  KILOGRAM
+  METER
+}
+
+enum StockDocumentType {
+  RECEIPT
+  ISSUE
+}
+
+enum StockDocumentStatus {
+  DRAFT
+  APPROVED
+  CANCELLED
+}
+
+enum TransferStatus {
+  DRAFT
+  SHIPPED
+  RECEIVED
+  CANCELLED
+  RETURNED
+}
+
+enum TransferMovementPhase {
+  SHIPMENT
+  RECEIPT
+  RETURN_FROM_TRANSIT
+  RETURN_SHIPMENT
+  RETURN_RECEIPT
+}
+
+enum TransferReturnOrigin {
+  SHIPPED
+  RECEIVED
+}
+
+enum CountStatus {
+  OPEN
+  APPROVED
+  CANCELLED
+}
+
+enum StockDirection {
+  IN
+  OUT
+}
+
+enum StockMovementType {
+  RECEIPT
+  ISSUE
+  TRANSFER_SHIPMENT
+  TRANSFER_RECEIPT
+  TRANSFER_RETURN
+  COUNT_ADJUSTMENT
+  REVERSAL
+}
+
+model User {
+  id                   String              @id @default(uuid()) @db.Uuid
+  username             String              @unique(map: "User_username_key") @db.VarChar(64)
+  displayName          String              @db.VarChar(120)
+  passwordHash         String              @db.VarChar(255)
+  role                 UserRole            @default(VIEWER)
+  isActive             Boolean             @default(true)
+  createdAt            DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime            @updatedAt @db.Timestamptz(3)
+  sessions             Session[]
+  warehouseAssignments UserWarehouse[]
+  createdDocuments     StockDocument[]     @relation("StockDocumentCreator")
+  approvedDocuments    StockDocument[]     @relation("StockDocumentApprover")
+  cancelledDocuments   StockDocument[]     @relation("StockDocumentCanceller")
+  createdTransfers     Transfer[]          @relation("TransferCreator")
+  shippedTransfers     Transfer[]          @relation("TransferShipper")
+  receivedTransfers    Transfer[]          @relation("TransferReceiver")
+  cancelledTransfers   Transfer[]          @relation("TransferCanceller")
+  returnedTransfers    Transfer[]          @relation("TransferReturner")
+  openedCounts         StockCount[]        @relation("StockCountOpener")
+  responsibleCounts    StockCount[]        @relation("StockCountResponsible")
+  approvedCounts       StockCount[]        @relation("StockCountApprover")
+  cancelledCounts      StockCount[]        @relation("StockCountCanceller")
+  stockMovements       StockMovement[]
+  idempotencyRecords   IdempotencyRecord[]
+  auditEvents          AuditEvent[]
+
+  @@map("User")
+}
+
+model Session {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  tokenHash  String    @unique(map: "Session_tokenHash_key") @db.Char(64)
+  expiresAt  DateTime  @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+  lastSeenAt DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([userId, expiresAt], map: "Session_userId_expiresAt_idx")
+  @@map("Session")
+}
+
+model UserWarehouse {
+  userId      String    @db.Uuid
+  warehouseId String    @db.Uuid
+  assignedAt  DateTime  @default(now()) @db.Timestamptz(3)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@id([userId, warehouseId])
+  @@index([warehouseId, userId], map: "UserWarehouse_warehouseId_userId_idx")
+  @@map("UserWarehouse")
+}
+
+model Category {
+  id        String    @id @default(uuid()) @db.Uuid
+  code      String    @unique(map: "Category_code_key") @db.VarChar(48)
+  name      String    @db.VarChar(120)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  products  Product[]
+
+  @@map("Category")
+}
+
+model Product {
+  id            String                    @id @default(uuid()) @db.Uuid
+  sku           String                    @unique(map: "Product_sku_key") @db.VarChar(64)
+  barcode       String?                   @unique(map: "Product_barcode_key") @db.VarChar(64)
+  name          String                    @db.VarChar(180)
+  description   String?                   @db.VarChar(1000)
+  unit          Unit
+  isActive      Boolean                   @default(true)
+  categoryId    String                    @db.Uuid
+  createdAt     DateTime                  @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime                  @updatedAt @db.Timestamptz(3)
+  category      Category                  @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  settings      WarehouseProductSetting[]
+  balances      StockBalance[]
+  documentLines StockDocumentLine[]
+  transferLines TransferLine[]
+  countLines    StockCountLine[]
+  movements     StockMovement[]
+
+  @@index([name], map: "Product_name_idx")
+  @@index([categoryId, isActive], map: "Product_categoryId_isActive_idx")
+  @@map("Product")
+}
+
+model Warehouse {
+  id              String                    @id @default(uuid()) @db.Uuid
+  code            String                    @unique(map: "Warehouse_code_key") @db.VarChar(48)
+  name            String                    @db.VarChar(120)
+  isActive        Boolean                   @default(true)
+  createdAt       DateTime                  @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime                  @updatedAt @db.Timestamptz(3)
+  locations       WarehouseLocation[]
+  productSettings WarehouseProductSetting[]
+  balances        StockBalance[]
+  userAssignments UserWarehouse[]
+  stockDocuments  StockDocument[]
+  sourceTransfers Transfer[]                @relation("TransferSourceWarehouse")
+  targetTransfers Transfer[]                @relation("TransferTargetWarehouse")
+  stockCounts     StockCount[]
+  movements       StockMovement[]
+
+  @@map("Warehouse")
+}
+
+model WarehouseLocation {
+  id            String              @id @default(uuid()) @db.Uuid
+  warehouseId   String              @db.Uuid
+  code          String              @db.VarChar(48)
+  name          String              @db.VarChar(120)
+  isActive      Boolean             @default(true)
+  createdAt     DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime            @updatedAt @db.Timestamptz(3)
+  warehouse     Warehouse           @relation(fields: [warehouseId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  documentLines StockDocumentLine[]
+
+  @@unique([warehouseId, code], map: "WarehouseLocation_warehouseId_code_key")
+  @@index([warehouseId, isActive], map: "WarehouseLocation_warehouseId_isActive_idx")
+  @@map("WarehouseLocation")
+}
+
+model Supplier {
+  id          String          @id @default(uuid()) @db.Uuid
+  code        String          @unique(map: "Supplier_code_key") @db.VarChar(48)
+  name        String          @db.VarChar(160)
+  contactName String?         @db.VarChar(120)
+  email       String?         @db.VarChar(254)
+  phone       String?         @db.VarChar(40)
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime        @updatedAt @db.Timestamptz(3)
+  documents   StockDocument[]
+
+  @@index([name], map: "Supplier_name_idx")
+  @@map("Supplier")
+}
+
+model WarehouseProductSetting {
+  id           String    @id @default(uuid()) @db.Uuid
+  warehouseId  String    @db.Uuid
+  productId    String    @db.Uuid
+  minimumStock Decimal   @default(0) @db.Decimal(18, 3)
+  warehouse    Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  product      Product   @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([warehouseId, productId], map: "WarehouseProductSetting_warehouseId_productId_key")
+  @@map("WarehouseProductSetting")
+}
+
+model StockBalance {
+  warehouseId String    @db.Uuid
+  productId   String    @db.Uuid
+  quantity    Decimal   @default(0) @db.Decimal(18, 3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@id([warehouseId, productId])
+  @@index([productId, warehouseId], map: "StockBalance_productId_warehouseId_idx")
+  @@map("StockBalance")
+}
+
+model StockDocument {
+  id             String              @id @default(uuid()) @db.Uuid
+  documentNumber BigInt              @unique(map: "StockDocument_documentNumber_key") @default(autoincrement())
+  type           StockDocumentType
+  status         StockDocumentStatus @default(DRAFT)
+  warehouseId    String              @db.Uuid
+  supplierId     String?             @db.Uuid
+  reference      String?             @db.VarChar(120)
+  description    String?             @db.VarChar(1000)
+  createdById    String              @db.Uuid
+  approvedById   String?             @db.Uuid
+  cancelledById  String?             @db.Uuid
+  createdAt      DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime            @updatedAt @db.Timestamptz(3)
+  approvedAt     DateTime?           @db.Timestamptz(3)
+  cancelledAt    DateTime?           @db.Timestamptz(3)
+  warehouse      Warehouse           @relation(fields: [warehouseId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  supplier       Supplier?           @relation(fields: [supplierId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdBy      User                @relation("StockDocumentCreator", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  approvedBy     User?               @relation("StockDocumentApprover", fields: [approvedById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  cancelledBy    User?               @relation("StockDocumentCanceller", fields: [cancelledById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  lines          StockDocumentLine[]
+
+  @@index([warehouseId, status, createdAt], map: "StockDocument_warehouseId_status_createdAt_idx")
+  @@index([createdAt], map: "StockDocument_createdAt_idx")
+  @@map("StockDocument")
+}
+
+model StockDocumentLine {
+  id          String             @id @default(uuid()) @db.Uuid
+  documentId  String             @db.Uuid
+  productId   String             @db.Uuid
+  locationId  String?            @db.Uuid
+  unit        Unit
+  quantity    Decimal            @db.Decimal(18, 3)
+  description String?            @db.VarChar(500)
+  document    StockDocument      @relation(fields: [documentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  product     Product            @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  location    WarehouseLocation? @relation(fields: [locationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  movements   StockMovement[]    @relation("StockMovementDocumentLine")
+
+  @@unique([documentId, productId], map: "StockDocumentLine_documentId_productId_key")
+  @@index([productId], map: "StockDocumentLine_productId_idx")
+  @@map("StockDocumentLine")
+}
+
+model Transfer {
+  id                String                @id @default(uuid()) @db.Uuid
+  transferNumber    BigInt                @unique(map: "Transfer_transferNumber_key") @default(autoincrement())
+  sourceWarehouseId String                @db.Uuid
+  targetWarehouseId String                @db.Uuid
+  status            TransferStatus        @default(DRAFT)
+  returnOrigin      TransferReturnOrigin?
+  returnReason      String?               @db.VarChar(1000)
+  description       String?               @db.VarChar(1000)
+  createdById       String                @db.Uuid
+  shippedById       String?               @db.Uuid
+  receivedById      String?               @db.Uuid
+  cancelledById     String?               @db.Uuid
+  returnedById      String?               @db.Uuid
+  createdAt         DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime              @updatedAt @db.Timestamptz(3)
+  shippedAt         DateTime?             @db.Timestamptz(3)
+  receivedAt        DateTime?             @db.Timestamptz(3)
+  cancelledAt       DateTime?             @db.Timestamptz(3)
+  returnedAt        DateTime?             @db.Timestamptz(3)
+  sourceWarehouse   Warehouse             @relation("TransferSourceWarehouse", fields: [sourceWarehouseId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  targetWarehouse   Warehouse             @relation("TransferTargetWarehouse", fields: [targetWarehouseId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdBy         User                  @relation("TransferCreator", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  shippedBy         User?                 @relation("TransferShipper", fields: [shippedById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  receivedBy        User?                 @relation("TransferReceiver", fields: [receivedById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  cancelledBy       User?                 @relation("TransferCanceller", fields: [cancelledById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  returnedBy        User?                 @relation("TransferReturner", fields: [returnedById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  lines             TransferLine[]
+
+  @@index([sourceWarehouseId, status, createdAt], map: "Transfer_sourceWarehouseId_status_createdAt_idx")
+  @@index([targetWarehouseId, status, createdAt], map: "Transfer_targetWarehouseId_status_createdAt_idx")
+  @@map("Transfer")
+}
+
+model TransferLine {
+  id         String          @id @default(uuid()) @db.Uuid
+  transferId String          @db.Uuid
+  productId  String          @db.Uuid
+  unit       Unit
+  quantity   Decimal         @db.Decimal(18, 3)
+  transfer   Transfer        @relation(fields: [transferId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  product    Product         @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  movements  StockMovement[] @relation("StockMovementTransferLine")
+
+  @@unique([transferId, productId], map: "TransferLine_transferId_productId_key")
+  @@index([productId], map: "TransferLine_productId_idx")
+  @@map("TransferLine")
+}
+
+model StockCount {
+  id                String           @id @default(uuid()) @db.Uuid
+  countNumber       BigInt           @unique(map: "StockCount_countNumber_key") @default(autoincrement())
+  warehouseId       String           @db.Uuid
+  status            CountStatus      @default(OPEN)
+  openedById        String           @db.Uuid
+  responsibleUserId String           @db.Uuid
+  approvedById      String?          @db.Uuid
+  cancelledById     String?          @db.Uuid
+  description       String?          @db.VarChar(1000)
+  startedAt         DateTime         @default(now()) @db.Timestamptz(3)
+  closedAt          DateTime?        @db.Timestamptz(3)
+  approvedAt        DateTime?        @db.Timestamptz(3)
+  cancelledAt       DateTime?        @db.Timestamptz(3)
+  updatedAt         DateTime         @default(now()) @updatedAt @db.Timestamptz(3)
+  warehouse         Warehouse        @relation(fields: [warehouseId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  openedBy          User             @relation("StockCountOpener", fields: [openedById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  responsibleUser   User             @relation("StockCountResponsible", fields: [responsibleUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  approvedBy        User?            @relation("StockCountApprover", fields: [approvedById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  cancelledBy       User?            @relation("StockCountCanceller", fields: [cancelledById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  lines             StockCountLine[]
+
+  @@index([warehouseId, startedAt], map: "StockCount_warehouseId_startedAt_idx")
+  @@map("StockCount")
+}
+
+model StockCountLine {
+  id               String          @id @default(uuid()) @db.Uuid
+  countId          String          @db.Uuid
+  productId        String          @db.Uuid
+  unit             Unit
+  snapshotQuantity Decimal         @db.Decimal(18, 3)
+  countedQuantity  Decimal?        @db.Decimal(18, 3)
+  count            StockCount      @relation(fields: [countId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  product          Product         @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  movements        StockMovement[] @relation("StockMovementCountLine")
+
+  @@unique([countId, productId], map: "StockCountLine_countId_productId_key")
+  @@index([productId], map: "StockCountLine_productId_idx")
+  @@map("StockCountLine")
+}
+
+model StockMovement {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  productId          String                 @db.Uuid
+  warehouseId        String                 @db.Uuid
+  direction          StockDirection
+  quantity           Decimal                @db.Decimal(18, 3)
+  unit               Unit
+  type               StockMovementType
+  createdById        String                 @db.Uuid
+  createdAt          DateTime               @default(now()) @db.Timestamptz(3)
+  documentLineId     String?                @db.Uuid
+  transferLineId     String?                @db.Uuid
+  transferPhase      TransferMovementPhase?
+  countLineId        String?                @db.Uuid
+  reversesMovementId String?                @unique(map: "StockMovement_reversesMovementId_key") @db.Uuid
+  reason             String?                @db.VarChar(1000)
+  product            Product                @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  warehouse          Warehouse              @relation(fields: [warehouseId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdBy          User                   @relation(fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  documentLine       StockDocumentLine?     @relation("StockMovementDocumentLine", fields: [documentLineId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  transferLine       TransferLine?          @relation("StockMovementTransferLine", fields: [transferLineId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  countLine          StockCountLine?        @relation("StockMovementCountLine", fields: [countLineId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  reversesMovement   StockMovement?         @relation("MovementReversal", fields: [reversesMovementId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  reversal           StockMovement?         @relation("MovementReversal")
+
+  @@unique([transferLineId, transferPhase], map: "StockMovement_transferLineId_transferPhase_key")
+  @@unique([documentLineId], map: "StockMovement_documentLineId_key")
+  @@unique([countLineId], map: "StockMovement_countLineId_key")
+  @@index([warehouseId, createdAt], map: "StockMovement_warehouseId_createdAt_idx")
+  @@index([productId, warehouseId, createdAt], map: "StockMovement_productId_warehouseId_createdAt_idx")
+  @@index([createdById, createdAt], map: "StockMovement_createdById_createdAt_idx")
+  @@map("StockMovement")
+}
+
+model IdempotencyRecord {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @db.Uuid
+  operationScope  String    @db.VarChar(80)
+  key             String    @db.VarChar(200)
+  requestHash     String    @db.Char(64)
+  resultType      String?   @db.VarChar(80)
+  resultReference String?   @db.VarChar(200)
+  response        Json?
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  completedAt     DateTime? @db.Timestamptz(3)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([userId, operationScope, key], map: "IdempotencyRecord_userId_operationScope_key_key")
+  @@index([createdAt], map: "IdempotencyRecord_createdAt_idx")
+  @@map("IdempotencyRecord")
+}
+
+model AuditEvent {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @db.Uuid
+  action        String   @db.VarChar(100)
+  relatedType   String   @db.VarChar(80)
+  relatedId     String   @db.VarChar(200)
+  changeSummary Json?
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([relatedType, relatedId, createdAt], map: "AuditEvent_relatedType_relatedId_createdAt_idx")
+  @@index([userId, createdAt], map: "AuditEvent_userId_createdAt_idx")
+  @@map("AuditEvent")
+}
+
+model AppMigrationGuard {
+  projectKey String   @id @db.Text
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  @@map("_app_migration_guard")
+}

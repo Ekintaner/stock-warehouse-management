@@ -1,0 +1,25 @@
+{
+  "name": "@local-stock-warehouse/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=../../.env --import tsx --watch src/server.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx --test src/app.test.ts src/modules/auth/auth.test.ts src/database/local-database-target.test.ts",
+    "prisma": "prisma --config prisma.config.ts"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "dotenv": "18.0.5",
+    "fastify": "5.12.5",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "@types/pg": "8.23.1",
+    "prisma": "7.10.0",
+    "tsx": "4.23.15"
+  }
+}
