@@ -282,7 +282,10 @@ function pageArgs(query: { page?: number; pageSize?: number }) {
   return { page, pageSize, skip: (page - 1) * pageSize, take: pageSize };
 }
 
-function normalizeText(value: string | null | undefined, max: number): string | null {
+function normalizeText(
+  value: string | null | undefined,
+  max: number,
+): string | null {
   if (value == null) return null;
   const text = value.trim();
   if (text.length > max) invalid(`Metin en fazla ${max} karakter olabilir.`);
@@ -291,7 +294,9 @@ function normalizeText(value: string | null | undefined, max: number): string | 
 
 function parseQuantity(value: string, unit: Unit): Prisma.Decimal {
   if (!/^\d{1,15}(?:\.\d{1,3})?$/.test(value)) {
-    invalid("Miktar pozitif olmalı ve en fazla üç ondalık basamak içermelidir.");
+    invalid(
+      "Miktar pozitif olmalı ve en fazla üç ondalık basamak içermelidir.",
+    );
   }
   const quantity = new Prisma.Decimal(value);
   if (quantity.lte(0)) {
@@ -313,7 +318,9 @@ function expectedDate(value: string): Date {
 
 function ensureNotStale(actual: Date, expected: string): void {
   if (actual.getTime() !== expectedDate(expected).getTime()) {
-    conflict("Belge başka bir kullanıcı tarafından değiştirildi. Güncel belgeyi yeniden açın.");
+    conflict(
+      "Belge başka bir kullanıcı tarafından değiştirildi. Güncel belgeyi yeniden açın.",
+    );
   }
 }
 
@@ -354,7 +361,9 @@ async function validateLines(
 ) {
   ensureUniqueProducts(lines);
   const ids = lines.map((line) => line.productId);
-  for (const id of [...new Set(ids.map((productId) => productId.toLowerCase()))].sort()) {
+  for (const id of [
+    ...new Set(ids.map((productId) => productId.toLowerCase())),
+  ].sort()) {
     await db.$queryRaw<Array<{ id: string }>>`
       SELECT "id"::text AS "id"
       FROM "Product"
@@ -367,7 +376,8 @@ async function validateLines(
     select: { id: true, sku: true, name: true, unit: true, isActive: true },
   });
   const byId = new Map(products.map((product) => [product.id, product]));
-  if (products.length !== ids.length) invalid("Seçilen ürünlerden biri bulunamadı.");
+  if (products.length !== ids.length)
+    invalid("Seçilen ürünlerden biri bulunamadı.");
 
   const locations = lines.flatMap((line) =>
     line.locationId ? [line.locationId] : [],
@@ -378,7 +388,9 @@ async function validateLines(
         select: { id: true, warehouseId: true, isActive: true },
       })
     : [];
-  const locationById = new Map(foundLocations.map((location) => [location.id, location]));
+  const locationById = new Map(
+    foundLocations.map((location) => [location.id, location]),
+  );
   const validated = lines.map((line) => {
     const product = byId.get(line.productId);
     if (!product) invalid("Seçilen ürünlerden biri bulunamadı.");
@@ -715,7 +727,13 @@ export function registerStockRoutes(
       });
       if (!document) notFound();
       canReadWarehouse(user, document.warehouseId);
-      return documentResponse(document);
+      const response = documentResponse(document);
+      const reversalCount = await databaseClient().stockMovement.count({
+        where: {
+          reversesMovement: { documentLine: { documentId: document.id } },
+        },
+      });
+      return { ...response, isReversed: reversalCount > 0 };
     },
   );
 
@@ -955,7 +973,9 @@ export function registerStockRoutes(
         await lockDocumentLines(tx, request.params.id);
         const before = await tx.stockDocument.findUnique({
           where: { id: request.params.id },
-          include: { lines: { orderBy: [{ productId: "asc" }, { id: "asc" }] } },
+          include: {
+            lines: { orderBy: [{ productId: "asc" }, { id: "asc" }] },
+          },
         });
         if (!before) notFound();
         canReadWarehouse(user, before.warehouseId);
@@ -977,12 +997,19 @@ export function registerStockRoutes(
               },
             },
           });
-          if (!prior) conflict("İşlem sonucu henüz doğrulanamadı. Aynı anahtarla tekrar deneyin.");
+          if (!prior)
+            conflict(
+              "İşlem sonucu henüz doğrulanamadı. Aynı anahtarla tekrar deneyin.",
+            );
           if (prior.requestHash !== requestHash) {
-            conflict("Bu güvenli tekrar anahtarı farklı bir onay isteğinde kullanılmış.");
+            conflict(
+              "Bu güvenli tekrar anahtarı farklı bir onay isteğinde kullanılmış.",
+            );
           }
           if (!prior.completedAt || !prior.response) {
-            conflict("Onay sonucu tamamlanmamış. Aynı anahtarla tekrar deneyin.");
+            conflict(
+              "Onay sonucu tamamlanmamış. Aynı anahtarla tekrar deneyin.",
+            );
           }
           return prior.response;
         }
@@ -1023,7 +1050,9 @@ export function registerStockRoutes(
           where: { id: { in: productIds } },
           select: { id: true, sku: true, unit: true, isActive: true },
         });
-        const productById = new Map(products.map((product) => [product.id, product]));
+        const productById = new Map(
+          products.map((product) => [product.id, product]),
+        );
         if (products.length !== productIds.length) {
           conflict("Belgedeki ürünlerden biri artık kullanılamıyor.");
         }
@@ -1239,12 +1268,17 @@ export function registerStockRoutes(
         ? new Date(request.query.from)
         : undefined;
       const to = request.query.to ? new Date(request.query.to) : undefined;
-      if (from && to && from > to) invalid("Başlangıç tarihi bitiş tarihinden sonra olamaz.");
+      if (from && to && from > to)
+        invalid("Başlangıç tarihi bitiş tarihinden sonra olamaz.");
       const { page, pageSize, skip, take } = pageArgs(request.query);
       const where: Prisma.StockMovementWhereInput = {
         ...(warehouseIds ? { warehouseId: { in: warehouseIds } } : {}),
-        ...(request.query.productId ? { productId: request.query.productId } : {}),
-        ...(request.query.direction ? { direction: request.query.direction } : {}),
+        ...(request.query.productId
+          ? { productId: request.query.productId }
+          : {}),
+        ...(request.query.direction
+          ? { direction: request.query.direction }
+          : {}),
         ...(from || to
           ? {
               createdAt: {
@@ -1260,7 +1294,9 @@ export function registerStockRoutes(
           include: {
             product: { select: { id: true, sku: true, name: true } },
             warehouse: { select: { id: true, code: true, name: true } },
-            createdBy: { select: { id: true, username: true, displayName: true } },
+            createdBy: {
+              select: { id: true, username: true, displayName: true },
+            },
             documentLine: {
               select: {
                 document: {
@@ -1296,7 +1332,8 @@ export function registerStockRoutes(
           document: item.documentLine
             ? {
                 ...item.documentLine.document,
-                documentNumber: item.documentLine.document.documentNumber.toString(),
+                documentNumber:
+                  item.documentLine.document.documentNumber.toString(),
               }
             : null,
         })),

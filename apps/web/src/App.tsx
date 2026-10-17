@@ -128,7 +128,7 @@ function App() {
             message:
               error instanceof Error && error.message !== "fetch failed"
                 ? error.message
-                : "Uygulamaya ulaşılamadı. Yerel geliştirme ortamını kontrol edip tekrar deneyin.",
+                : "Uygulamaya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.",
           });
         } else {
           setState({

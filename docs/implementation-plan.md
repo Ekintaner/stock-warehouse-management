@@ -1,3 +1,8 @@
+> **Güncel teslim — 2026-10-17:** Sayım backend ve arayüzü, belge tam terslemesi,
+> tedarikçiler, kullanıcı/depo atamaları, minimum stok, stok/dönem raporları,
+> CSV, denetim ve defter/bakiye kontrolü uygulanmıştır. Aşağıdaki eski aşama
+> notları tarihseldir; güncel kapsam README ve doğrulama raporundadır.
+
 # Uygulama planı
 
 Bu plan numaralı aşamaları korur. Her aşama tamamlanmış özellik iddiası değildir; çıktılar ve doğrulama koşulları geliştirme sırasında yerine getirilmesi gereken hedeflerdir. Aşama 3'ün oturum altyapısına bağlı `3.1` ana-kayıt teslimatı, stok modüllerine geçmeden önce ayrı kapsam olarak tamamlanmıştır; Aşama 4–8 numaraları ve kapsamı değiştirilmemiştir.
@@ -205,3 +210,19 @@ Yerel PostgreSQL bağlantısı, veritabanı kurulumu, Prisma şeması ve migrati
 - Sentetik demo kaydı açıklaması görünür olmalı; uydurma başarı/kullanıcı istatistiği olmamalı.
 - Kritik uçtan uca senaryolar: giriş → çıkış; çift istek; eşzamanlı çıkış; atomik çok satırlı belge; transfer taslak-sevk-teslim/ters dönüş; sayım ve yarış; yetkisiz erişim; ters hareket; uzlaştırma.
 - Uygulamanın kurulum, migration, başlatma ve test yönergeleri yeni yerel ortamda takip edilebilir olmalı.
+
+
+## Güncel tamamlama kaydı — 2026-10-17
+
+- [x] Aşama 6: sayım açma/snapshot, miktar girişi, onay/iptal ve web ekranı.
+- [x] Aşama 7: kullanıcı/depo ataması, tedarikçi ve denetim ekranları.
+- [x] Aşama 8: stok/eşik/düşük stok, dönemsel hareket, CSV ve uzlaştırma.
+- [x] Onaylı giriş/çıkış belgesini tam ters hareketle düzeltme.
+- [x] Prisma 7.10.1 uyumlu yama; geçişli audit bulgularının giderilmesi.
+- [x] Katalog testinde tarihsel satırları silen temizlik kaldırıldı.
+- [x] İlk yönetici için var olan hesap koruması ve izole şemada ilk oluşturma yarışı.
+- [x] Browser kabul testi ayrı test DB ile tekrar çalıştırılabilir komuta bağlandı.
+
+Kapsam dışı: teslim sonrası/kısmi iadeler, maliyet muhasebesi, lot/seri,
+e-posta servisleri ve internet hosting. GitHub commit/push bu çalışmada yapılmadı.
+Son komut sonuçları docs/verification.md içinde tutulur.

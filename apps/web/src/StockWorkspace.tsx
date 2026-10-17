@@ -43,6 +43,7 @@ interface StockLine {
 }
 
 interface StockDocument {
+  isReversed?: boolean;
   id: string;
   documentNumber: string;
   type: DocumentType;
@@ -164,7 +165,9 @@ function useWarehouses(csrfToken: string) {
       })
       .catch((cause: unknown) => {
         if (!cancelled) {
-          setError(cause instanceof Error ? cause.message : "Depolar yüklenemedi.");
+          setError(
+            cause instanceof Error ? cause.message : "Depolar yüklenemedi.",
+          );
         }
       })
       .finally(() => {
@@ -189,18 +192,30 @@ function Link({
   className?: string;
 }) {
   return (
-    <a className={className} href={href} onClick={(event) => navigate(event, href)}>
+    <a
+      className={className}
+      href={href}
+      onClick={(event) => navigate(event, href)}
+    >
       {children}
     </a>
   );
 }
 
 function Loading() {
-  return <p className="state-message" role="status">Yükleniyor…</p>;
+  return (
+    <p className="state-message" role="status">
+      Yükleniyor…
+    </p>
+  );
 }
 
 function ErrorMessage({ children }: { children: string }) {
-  return <p className="error-banner" role="alert">{children}</p>;
+  return (
+    <p className="error-banner" role="alert">
+      {children}
+    </p>
+  );
 }
 
 function Empty({ children }: { children: string }) {
@@ -221,10 +236,26 @@ function Pagination({
   const pages = Math.max(1, Math.ceil(total / pageSize));
   return (
     <div className="pagination" aria-label="Sayfalama">
-      <span>{total} kayıt · Sayfa {page} / {pages}</span>
+      <span>
+        {total} kayıt · Sayfa {page} / {pages}
+      </span>
       <div>
-        <button className="secondary-button" type="button" disabled={page <= 1} onClick={() => onPage(page - 1)}>Önceki</button>
-        <button className="secondary-button" type="button" disabled={page >= pages} onClick={() => onPage(page + 1)}>Sonraki</button>
+        <button
+          className="secondary-button"
+          type="button"
+          disabled={page <= 1}
+          onClick={() => onPage(page - 1)}
+        >
+          Önceki
+        </button>
+        <button
+          className="secondary-button"
+          type="button"
+          disabled={page >= pages}
+          onClick={() => onPage(page + 1)}
+        >
+          Sonraki
+        </button>
       </div>
     </div>
   );
@@ -290,8 +321,11 @@ function StockWorkspace(props: Props) {
 }
 
 function StockPage({ csrfToken }: { csrfToken: string }) {
-  const { warehouses, error: warehouseError, loading: warehousesLoading } =
-    useWarehouses(csrfToken);
+  const {
+    warehouses,
+    error: warehouseError,
+    loading: warehousesLoading,
+  } = useWarehouses(csrfToken);
   const visibleWarehouses = warehouses;
   const [warehouseId, setWarehouseId] = useState("");
   const [q, setQ] = useState("");
@@ -328,21 +362,26 @@ function StockPage({ csrfToken }: { csrfToken: string }) {
       direction: "asc",
     });
     if (q.trim()) params.set("q", q.trim());
-    api<Page<{
-      id: string;
-      sku: string;
-      name: string;
-      unit: Unit;
-      isActive: boolean;
-      quantity: string;
-      inTransitIncoming: string;
-      inTransitOutgoing: string;
-    }>>(`/api/stock?${params}`, csrfToken)
+    api<
+      Page<{
+        id: string;
+        sku: string;
+        name: string;
+        unit: Unit;
+        isActive: boolean;
+        quantity: string;
+        inTransitIncoming: string;
+        inTransitOutgoing: string;
+      }>
+    >(`/api/stock?${params}`, csrfToken)
       .then((result) => {
         if (!cancelled) setData(result);
       })
       .catch((cause: unknown) => {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : "Stok bilgisi alınamadı.");
+        if (!cancelled)
+          setError(
+            cause instanceof Error ? cause.message : "Stok bilgisi alınamadı.",
+          );
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -355,7 +394,10 @@ function StockPage({ csrfToken }: { csrfToken: string }) {
   return (
     <section>
       <header className="page-header">
-        <div><h1>Stok</h1><p>Depo bazında güncel miktarlar</p></div>
+        <div>
+          <h1>Stok</h1>
+          <p>Depo bazında güncel miktarlar</p>
+        </div>
       </header>
       {warehouseError && <ErrorMessage>{warehouseError}</ErrorMessage>}
       <div className="stock-filter-bar">
@@ -371,7 +413,10 @@ function StockPage({ csrfToken }: { csrfToken: string }) {
           >
             <option value="">Depo seçin</option>
             {visibleWarehouses.map((warehouse) => (
-              <option key={warehouse.id} value={warehouse.id}>{warehouse.code} · {warehouse.name}{warehouse.isActive ? "" : " (Pasif)"}</option>
+              <option key={warehouse.id} value={warehouse.id}>
+                {warehouse.code} · {warehouse.name}
+                {warehouse.isActive ? "" : " (Pasif)"}
+              </option>
             ))}
           </select>
         </label>
@@ -388,27 +433,52 @@ function StockPage({ csrfToken }: { csrfToken: string }) {
           />
         </label>
       </div>
-      {loading ? <Loading /> : error ? <ErrorMessage>{error}</ErrorMessage> : !warehouseId ? (
+      {loading ? (
+        <Loading />
+      ) : error ? (
+        <ErrorMessage>{error}</ErrorMessage>
+      ) : !warehouseId ? (
         <Empty>Görüntülenebilecek aktif depo bulunamadı.</Empty>
       ) : data?.items.length ? (
         <>
           <div className="table-wrap">
             <table>
-              <thead><tr><th scope="col">SKU</th><th scope="col">Ürün</th><th scope="col">Birim</th><th scope="col">Stok</th><th scope="col">Yoldaki giriş</th><th scope="col">Yoldaki çıkış</th><th scope="col">Durum</th></tr></thead>
-              <tbody>{data.items.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.sku}</td><td>{item.name}</td><td>{unitLabel(item.unit)}</td>
-                  <td className="quantity-cell">{item.quantity}</td>
-                  <td className="quantity-cell">{item.inTransitIncoming}</td>
-                  <td className="quantity-cell">{item.inTransitOutgoing}</td>
-                  <td>{item.isActive ? "Aktif" : "Pasif"}</td>
+              <thead>
+                <tr>
+                  <th scope="col">SKU</th>
+                  <th scope="col">Ürün</th>
+                  <th scope="col">Birim</th>
+                  <th scope="col">Stok</th>
+                  <th scope="col">Yoldaki giriş</th>
+                  <th scope="col">Yoldaki çıkış</th>
+                  <th scope="col">Durum</th>
                 </tr>
-              ))}</tbody>
+              </thead>
+              <tbody>
+                {data.items.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.sku}</td>
+                    <td>{item.name}</td>
+                    <td>{unitLabel(item.unit)}</td>
+                    <td className="quantity-cell">{item.quantity}</td>
+                    <td className="quantity-cell">{item.inTransitIncoming}</td>
+                    <td className="quantity-cell">{item.inTransitOutgoing}</td>
+                    <td>{item.isActive ? "Aktif" : "Pasif"}</td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
-          <Pagination page={data.page} pageSize={data.pageSize} total={data.total} onPage={setPage} />
+          <Pagination
+            page={data.page}
+            pageSize={data.pageSize}
+            total={data.total}
+            onPage={setPage}
+          />
         </>
-      ) : !loading ? <Empty>Bu aramayla eşleşen ürün yok.</Empty> : null}
+      ) : !loading ? (
+        <Empty>Bu aramayla eşleşen ürün yok.</Empty>
+      ) : null}
     </section>
   );
 }
@@ -451,7 +521,10 @@ function DocumentsList({
         if (!cancelled) setData(result);
       })
       .catch((cause: unknown) => {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : "Belgeler yüklenemedi.");
+        if (!cancelled)
+          setError(
+            cause instanceof Error ? cause.message : "Belgeler yüklenemedi.",
+          );
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -465,54 +538,126 @@ function DocumentsList({
   return (
     <section>
       <header className="page-header">
-        <div><h1>{documentTypeLabel(type)} belgeleri</h1></div>
-        {canWrite && <Link className="primary-button link-button" href={`${base}/new`} navigate={navigate}>Taslak oluştur</Link>}
+        <div>
+          <h1>{documentTypeLabel(type)} belgeleri</h1>
+        </div>
+        {canWrite && (
+          <Link
+            className="primary-button link-button"
+            href={`${base}/new`}
+            navigate={navigate}
+          >
+            Taslak oluştur
+          </Link>
+        )}
       </header>
       {warehouseError && <ErrorMessage>{warehouseError}</ErrorMessage>}
       <section className="stock-filter-bar" aria-label="Belge filtreleri">
         <label>
           Depo
-          <select value={warehouseId} onChange={(event) => { setPage(1); setWarehouseId(event.target.value); }}>
+          <select
+            value={warehouseId}
+            onChange={(event) => {
+              setPage(1);
+              setWarehouseId(event.target.value);
+            }}
+          >
             <option value="">Yetkili tüm depolar</option>
-            {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.code} · {warehouse.name}</option>)}
+            {warehouses.map((warehouse) => (
+              <option key={warehouse.id} value={warehouse.id}>
+                {warehouse.code} · {warehouse.name}
+              </option>
+            ))}
           </select>
         </label>
         <label>
           Durum
-          <select value={status} onChange={(event) => { setPage(1); setStatus(event.target.value); }}>
-            <option value="">Tüm durumlar</option><option value="DRAFT">Taslak</option>
-            <option value="APPROVED">Onaylandı</option><option value="CANCELLED">İptal edildi</option>
+          <select
+            value={status}
+            onChange={(event) => {
+              setPage(1);
+              setStatus(event.target.value);
+            }}
+          >
+            <option value="">Tüm durumlar</option>
+            <option value="DRAFT">Taslak</option>
+            <option value="APPROVED">Onaylandı</option>
+            <option value="CANCELLED">İptal edildi</option>
           </select>
         </label>
         <label>
           Referans veya açıklama
-          <input value={q} maxLength={120} onChange={(event) => { setPage(1); setQ(event.target.value); }} />
+          <input
+            value={q}
+            maxLength={120}
+            onChange={(event) => {
+              setPage(1);
+              setQ(event.target.value);
+            }}
+          />
         </label>
       </section>
-      {loading ? <Loading /> : error ? <ErrorMessage>{error}</ErrorMessage> : data?.items.length ? (
+      {loading ? (
+        <Loading />
+      ) : error ? (
+        <ErrorMessage>{error}</ErrorMessage>
+      ) : data?.items.length ? (
         <>
           <div className="table-wrap">
             <table>
-              <thead><tr><th scope="col">Belge no</th><th scope="col">Tarih</th><th scope="col">Depo</th><th scope="col">Referans</th><th scope="col">Satır</th><th scope="col">Durum</th></tr></thead>
-              <tbody>{data.items.map((item) => (
-                <tr key={item.id}>
-                  <td><Link href={`/stock-documents/${item.id}`} navigate={navigate}>{formatDocumentNumber(item)}</Link></td>
-                  <td>{formatDate(item.createdAt)}</td><td>{item.warehouse.code} · {item.warehouse.name}</td>
-                  <td>{item.reference ?? "—"}</td>
-                  <td>{(item as StockDocument & { _count?: { lines: number } })._count?.lines ?? "—"}</td>
-                  <td>{documentStatusLabel(item.status)}</td>
+              <thead>
+                <tr>
+                  <th scope="col">Belge no</th>
+                  <th scope="col">Tarih</th>
+                  <th scope="col">Depo</th>
+                  <th scope="col">Referans</th>
+                  <th scope="col">Satır</th>
+                  <th scope="col">Durum</th>
                 </tr>
-              ))}</tbody>
+              </thead>
+              <tbody>
+                {data.items.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <Link
+                        href={`/stock-documents/${item.id}`}
+                        navigate={navigate}
+                      >
+                        {formatDocumentNumber(item)}
+                      </Link>
+                    </td>
+                    <td>{formatDate(item.createdAt)}</td>
+                    <td>
+                      {item.warehouse.code} · {item.warehouse.name}
+                    </td>
+                    <td>{item.reference ?? "—"}</td>
+                    <td>
+                      {(item as StockDocument & { _count?: { lines: number } })
+                        ._count?.lines ?? "—"}
+                    </td>
+                    <td>{documentStatusLabel(item.status)}</td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
-          <Pagination page={data.page} pageSize={data.pageSize} total={data.total} onPage={setPage} />
+          <Pagination
+            page={data.page}
+            pageSize={data.pageSize}
+            total={data.total}
+            onPage={setPage}
+          />
         </>
-      ) : <Empty>Bu ölçütlere uygun belge yok.</Empty>}
+      ) : (
+        <Empty>Bu ölçütlere uygun belge yok.</Empty>
+      )}
     </section>
   );
 }
 
-function formatDocumentNumber(document: Pick<StockDocument, "documentNumber" | "type">): string {
+function formatDocumentNumber(
+  document: Pick<StockDocument, "documentNumber" | "type">,
+): string {
   const prefix = document.type === "RECEIPT" ? "GI" : "GC";
   return `${prefix}-${document.documentNumber.padStart(8, "0")}`;
 }
@@ -555,8 +700,11 @@ function DocumentForm({
   onSuccess: Props["onSuccess"];
 }) {
   const canWrite = role !== "VIEWER";
-  const { warehouses, error: warehouseError, loading: warehousesLoading } =
-    useWarehouses(csrfToken);
+  const {
+    warehouses,
+    error: warehouseError,
+    loading: warehousesLoading,
+  } = useWarehouses(csrfToken);
   const [warehouseId, setWarehouseId] = useState("");
   const [reference, setReference] = useState("");
   const [description, setDescription] = useState("");
@@ -567,7 +715,9 @@ function DocumentForm({
   const [productChoice, setProductChoice] = useState("");
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [document, setDocument] = useState<StockDocument | null>(null);
-  const [stockByProduct, setStockByProduct] = useState<Record<string, string>>({});
+  const [stockByProduct, setStockByProduct] = useState<Record<string, string>>(
+    {},
+  );
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(editing);
   const [saving, setSaving] = useState(false);
@@ -584,14 +734,19 @@ function DocumentForm({
         setReference(value.reference ?? "");
         setDescription(value.description ?? "");
         setSupplierId(value.supplierId ?? "");
-        setLines(value.lines.map((line) => ({
-          productId: line.productId,
-          quantity: line.quantity.replace(/\.?0+$/, ""),
-          product: line.product,
-        })));
+        setLines(
+          value.lines.map((line) => ({
+            productId: line.productId,
+            quantity: line.quantity.replace(/\.?0+$/, ""),
+            product: line.product,
+          })),
+        );
       })
       .catch((cause: unknown) => {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : "Belge yüklenemedi.");
+        if (!cancelled)
+          setError(
+            cause instanceof Error ? cause.message : "Belge yüklenemedi.",
+          );
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -622,7 +777,10 @@ function DocumentForm({
         if (!cancelled) setProducts(result.items);
       })
       .catch((cause: unknown) => {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : "Ürünler yüklenemedi.");
+        if (!cancelled)
+          setError(
+            cause instanceof Error ? cause.message : "Ürünler yüklenemedi.",
+          );
       });
     return () => {
       cancelled = true;
@@ -632,12 +790,20 @@ function DocumentForm({
   useEffect(() => {
     if (type !== "RECEIPT") return;
     let cancelled = false;
-    api<Page<Supplier>>("/api/suppliers?isActive=true&page=1&pageSize=100", csrfToken)
+    api<Page<Supplier>>(
+      "/api/suppliers?isActive=true&page=1&pageSize=100",
+      csrfToken,
+    )
       .then((result) => {
         if (!cancelled) setSuppliers(result.items);
       })
       .catch((cause: unknown) => {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : "Tedarikçiler yüklenemedi.");
+        if (!cancelled)
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : "Tedarikçiler yüklenemedi.",
+          );
       });
     return () => {
       cancelled = true;
@@ -666,7 +832,10 @@ function DocumentForm({
         if (!cancelled) setStockByProduct(Object.fromEntries(values));
       })
       .catch((cause: unknown) => {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : "Mevcut stok alınamadı.");
+        if (!cancelled)
+          setError(
+            cause instanceof Error ? cause.message : "Mevcut stok alınamadı.",
+          );
       });
     return () => {
       cancelled = true;
@@ -676,14 +845,19 @@ function DocumentForm({
   function addProduct() {
     const product = products.find((item) => item.id === productChoice);
     if (!product || lines.some((line) => line.productId === product.id)) return;
-    setLines((current) => [...current, { productId: product.id, quantity: "", product }]);
+    setLines((current) => [
+      ...current,
+      { productId: product.id, quantity: "", product },
+    ]);
     setProductChoice("");
   }
 
   function updateQuantity(productId: string, quantity: string) {
-    setLines((current) => current.map((line) =>
-      line.productId === productId ? { ...line, quantity } : line,
-    ));
+    setLines((current) =>
+      current.map((line) =>
+        line.productId === productId ? { ...line, quantity } : line,
+      ),
+    );
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -698,15 +872,18 @@ function DocumentForm({
       quantity: toApiQuantity(line.quantity),
     }));
     if (apiLines.some((line) => line.quantity === null)) {
-      setError("Miktarı pozitif bir sayı olarak, en fazla üç ondalık basamakla girin. Virgül kullanabilirsiniz.");
+      setError(
+        "Miktarı pozitif bir sayı olarak, en fazla üç ondalık basamakla girin. Virgül kullanabilirsiniz.",
+      );
       return;
     }
     setSaving(true);
     try {
       const method = editing ? "PATCH" : "POST";
-      const url = editing && documentId
-        ? `/api/stock-documents/${documentId}`
-        : "/api/stock-documents";
+      const url =
+        editing && documentId
+          ? `/api/stock-documents/${documentId}`
+          : "/api/stock-documents";
       const body = editing
         ? {
             reference,
@@ -728,7 +905,9 @@ function DocumentForm({
         body: JSON.stringify(body),
       });
       goTo(`/stock-documents/${saved.id}`);
-      onSuccess(editing ? "Taslak belge güncellendi." : "Taslak belge oluşturuldu.");
+      onSuccess(
+        editing ? "Taslak belge güncellendi." : "Taslak belge oluşturuldu.",
+      );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Belge kaydedilemedi.");
     } finally {
@@ -737,91 +916,212 @@ function DocumentForm({
   }
 
   if (loading) return <Loading />;
-  if (editing && error && !document) return <ErrorMessage>{error}</ErrorMessage>;
-  if (!canWrite) return <ErrorMessage>Bu işlem için yetkiniz yok.</ErrorMessage>;
+  if (editing && error && !document)
+    return <ErrorMessage>{error}</ErrorMessage>;
+  if (!canWrite)
+    return <ErrorMessage>Bu işlem için yetkiniz yok.</ErrorMessage>;
 
   return (
     <section>
       <header className="page-header">
-        <div><h1>{editing ? "Taslağı düzenle" : `Yeni ${documentTypeLabel(type).toLocaleLowerCase("tr-TR")} taslağı`}</h1></div>
+        <div>
+          <h1>
+            {editing
+              ? "Taslağı düzenle"
+              : `Yeni ${documentTypeLabel(type).toLocaleLowerCase("tr-TR")} taslağı`}
+          </h1>
+        </div>
       </header>
       {warehouseError && <ErrorMessage>{warehouseError}</ErrorMessage>}
-      <form className="data-form stock-form" onSubmit={(event) => void submit(event)}>
+      <form
+        className="data-form stock-form"
+        onSubmit={(event) => void submit(event)}
+      >
         {!editing ? (
           <label>
             Depo
-            <select required value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)} disabled={warehousesLoading}>
+            <select
+              required
+              value={warehouseId}
+              onChange={(event) => setWarehouseId(event.target.value)}
+              disabled={warehousesLoading}
+            >
               <option value="">Depo seçin</option>
-              {warehouses.filter((warehouse) => warehouse.isActive).map((warehouse) => (
-                <option key={warehouse.id} value={warehouse.id}>{warehouse.code} · {warehouse.name}</option>
-              ))}
+              {warehouses
+                .filter((warehouse) => warehouse.isActive)
+                .map((warehouse) => (
+                  <option key={warehouse.id} value={warehouse.id}>
+                    {warehouse.code} · {warehouse.name}
+                  </option>
+                ))}
             </select>
           </label>
         ) : (
-          <label>Depo<input value={document?.warehouse.name ?? ""} readOnly /></label>
+          <label>
+            Depo
+            <input value={document?.warehouse.name ?? ""} readOnly />
+          </label>
         )}
-        <label>Belge referansı<input maxLength={120} value={reference} onChange={(event) => setReference(event.target.value)} /></label>
+        <label>
+          Belge referansı
+          <input
+            maxLength={120}
+            value={reference}
+            onChange={(event) => setReference(event.target.value)}
+          />
+        </label>
         {type === "RECEIPT" && (
           <label>
             Tedarikçi
-            <select value={supplierId} onChange={(event) => setSupplierId(event.target.value)}>
+            <select
+              value={supplierId}
+              onChange={(event) => setSupplierId(event.target.value)}
+            >
               <option value="">Tedarikçi seçilmedi</option>
-              {suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.code} · {supplier.name}</option>)}
+              {suppliers.map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>
+                  {supplier.code} · {supplier.name}
+                </option>
+              ))}
             </select>
           </label>
         )}
-        <label>Açıklama<textarea maxLength={1000} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
+        <label>
+          Açıklama
+          <textarea
+            maxLength={1000}
+            rows={3}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+          />
+        </label>
         <fieldset className="stock-lines">
           <legend>Ürün satırları</legend>
           <div className="stock-product-picker">
             <label>
               Ürün ara
-              <input value={productQuery} maxLength={120} onChange={(event) => setProductQuery(event.target.value)} placeholder="SKU veya ürün adı" />
+              <input
+                value={productQuery}
+                maxLength={120}
+                onChange={(event) => setProductQuery(event.target.value)}
+                placeholder="SKU veya ürün adı"
+              />
             </label>
             <label>
               Ürün seçin
-              <select value={productChoice} onChange={(event) => setProductChoice(event.target.value)}>
+              <select
+                value={productChoice}
+                onChange={(event) => setProductChoice(event.target.value)}
+              >
                 <option value="">Ürün seçin</option>
-                {products.filter((product) => !lines.some((line) => line.productId === product.id)).map((product) => (
-                  <option key={product.id} value={product.id}>{product.sku} · {product.name}</option>
-                ))}
+                {products
+                  .filter(
+                    (product) =>
+                      !lines.some((line) => line.productId === product.id),
+                  )
+                  .map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.sku} · {product.name}
+                    </option>
+                  ))}
               </select>
             </label>
-            <button className="secondary-button" type="button" onClick={addProduct} disabled={!productChoice}>Satır ekle</button>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={addProduct}
+              disabled={!productChoice}
+            >
+              Satır ekle
+            </button>
           </div>
           {lines.length ? (
             <div className="table-wrap">
               <table>
-                <thead><tr><th scope="col">Ürün</th><th scope="col">Birim</th>{type === "ISSUE" && <th scope="col">Mevcut stok</th>}<th scope="col">Miktar</th><th scope="col">İşlem</th></tr></thead>
-                <tbody>{lines.map((line) => (
-                  <tr key={line.productId}>
-                    <td>{line.product.sku} · {line.product.name}</td>
-                    <td>{unitLabel(line.product.unit)}</td>
-                    {type === "ISSUE" && <td className="quantity-cell">{stockByProduct[line.productId] ?? "Yükleniyor…"}</td>}
-                    <td>
-                      <label className="quantity-input-label">
-                        <span className="visually-hidden">{line.product.name} miktarı</span>
-                        <input
-                          required
-                          inputMode="decimal"
-                          autoComplete="off"
-                          value={line.quantity}
-                          onChange={(event) => updateQuantity(line.productId, event.target.value)}
-                          aria-label={`${line.product.name} miktarı`}
-                        />
-                      </label>
-                    </td>
-                    <td><button className="text-button" type="button" onClick={() => setLines((current) => current.filter((item) => item.productId !== line.productId))}>Satırı kaldır</button></td>
+                <thead>
+                  <tr>
+                    <th scope="col">Ürün</th>
+                    <th scope="col">Birim</th>
+                    {type === "ISSUE" && <th scope="col">Mevcut stok</th>}
+                    <th scope="col">Miktar</th>
+                    <th scope="col">İşlem</th>
                   </tr>
-                ))}</tbody>
+                </thead>
+                <tbody>
+                  {lines.map((line) => (
+                    <tr key={line.productId}>
+                      <td>
+                        {line.product.sku} · {line.product.name}
+                      </td>
+                      <td>{unitLabel(line.product.unit)}</td>
+                      {type === "ISSUE" && (
+                        <td className="quantity-cell">
+                          {stockByProduct[line.productId] ?? "Yükleniyor…"}
+                        </td>
+                      )}
+                      <td>
+                        <label className="quantity-input-label">
+                          <span className="visually-hidden">
+                            {line.product.name} miktarı
+                          </span>
+                          <input
+                            required
+                            inputMode="decimal"
+                            autoComplete="off"
+                            value={line.quantity}
+                            onChange={(event) =>
+                              updateQuantity(line.productId, event.target.value)
+                            }
+                            aria-label={`${line.product.name} miktarı`}
+                          />
+                        </label>
+                      </td>
+                      <td>
+                        <button
+                          className="text-button"
+                          type="button"
+                          onClick={() =>
+                            setLines((current) =>
+                              current.filter(
+                                (item) => item.productId !== line.productId,
+                              ),
+                            )
+                          }
+                        >
+                          Satırı kaldır
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             </div>
-          ) : <Empty>Henüz ürün satırı eklenmedi.</Empty>}
+          ) : (
+            <Empty>Henüz ürün satırı eklenmedi.</Empty>
+          )}
         </fieldset>
         {error && <ErrorMessage>{error}</ErrorMessage>}
         <div className="form-actions">
-          <button className="primary-button" type="submit" disabled={saving || warehousesLoading}>{saving ? "Taslak kaydediliyor…" : "Taslağı kaydet"}</button>
-          <Link className="secondary-button link-button" href={editing && documentId ? `/stock-documents/${documentId}` : type === "RECEIPT" ? "/stock/receipts" : "/stock/issues"} navigate={navigate}>Vazgeç</Link>
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={saving || warehousesLoading}
+          >
+            {saving ? "Taslak kaydediliyor…" : "Taslağı kaydet"}
+          </button>
+          <Link
+            className="secondary-button link-button"
+            href={
+              editing && documentId
+                ? `/stock-documents/${documentId}`
+                : type === "RECEIPT"
+                  ? "/stock/receipts"
+                  : "/stock/issues"
+            }
+            navigate={navigate}
+          >
+            Vazgeç
+          </Link>
         </div>
       </form>
     </section>
@@ -847,20 +1147,93 @@ function DocumentDetail({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
+  const [reversal, setReversal] = useState<{
+    key: string;
+    reason: string;
+  } | null>(null);
+  const [reversed, setReversed] = useState(false);
+  async function reverseDocument() {
+    if (!document) return;
+    let pending = reversal;
+    if (!pending) {
+      const reason = window.prompt(
+        "Belgenin bütün stok etkileri ters hareketle düzeltilecek. Gerekçe yazın:",
+      );
+      if (!reason?.trim()) return;
+      if (
+        !window.confirm(
+          "Belge geçmişte korunacak; ters stok hareketleri oluşturulacak. Devam edilsin mi?",
+        )
+      )
+        return;
+      pending = { key: crypto.randomUUID(), reason: reason.trim() };
+      setReversal(pending);
+    }
+    setWorking(true);
+    setError("");
+    try {
+      const response = await fetch(
+        `/api/stock-documents/${document.id}/reverse`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken,
+            "Idempotency-Key": pending.key,
+          },
+          body: JSON.stringify({ reason: pending.reason }),
+        },
+      );
+      if (!response.ok) {
+        const message = await localErrorMessage(response);
+        if (response.status < 500) setReversal(null);
+        throw new Error(message);
+      }
+      setReversal(null);
+      setReversed(true);
+      onSuccess("Belgenin stok etkisi ters hareketlerle düzeltildi.");
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Sonuç alınamadı. Aynı işlemle yeniden deneyin.",
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
   const canWrite = role !== "VIEWER";
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError("");
     api<StockDocument>(`/api/stock-documents/${id}`, csrfToken)
-      .then((value) => { if (!cancelled) setDocument(value); })
-      .catch((cause: unknown) => { if (!cancelled) setError(cause instanceof Error ? cause.message : "Belge yüklenemedi."); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .then((value) => {
+        if (!cancelled) setDocument(value);
+      })
+      .catch((cause: unknown) => {
+        if (!cancelled)
+          setError(
+            cause instanceof Error ? cause.message : "Belge yüklenemedi.",
+          );
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id, csrfToken]);
 
   async function cancelDraft() {
-    if (!document || !window.confirm("Taslak iptal edilecek. Stok miktarları değişmez ve belge geçmişte korunur. Devam edilsin mi?")) return;
+    if (
+      !document ||
+      !window.confirm(
+        "Taslak iptal edilecek. Stok miktarları değişmez ve belge geçmişte korunur. Devam edilsin mi?",
+      )
+    )
+      return;
     setWorking(true);
     setError("");
     try {
@@ -875,7 +1248,9 @@ function DocumentDetail({
       setDocument(updated);
       onSuccess("Taslak belge iptal edildi; stok miktarı değişmedi.");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Taslak iptal edilemedi.");
+      setError(
+        cause instanceof Error ? cause.message : "Taslak iptal edilemedi.",
+      );
     } finally {
       setWorking(false);
     }
@@ -884,7 +1259,10 @@ function DocumentDetail({
   async function approveDraft() {
     if (!document) return;
     const summary = document.lines
-      .map((line) => `• ${line.product.sku} — ${line.quantity} ${unitLabel(line.unit)}`)
+      .map(
+        (line) =>
+          `• ${line.product.sku} — ${line.quantity} ${unitLabel(line.unit)}`,
+      )
       .join("\n");
     const message = `${documentTypeLabel(document.type)} ${formatDocumentNumber(document)} onaylanacak.\nDepo: ${document.warehouse.name}\n\n${summary}\n\nStok miktarları değiştirilecek. Onaylıyor musunuz?`;
     if (!window.confirm(message)) return;
@@ -897,15 +1275,18 @@ function DocumentDetail({
     setWorking(true);
     setError("");
     try {
-      const response = await fetch(`/api/stock-documents/${document.id}/approve`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": csrfToken,
-          "Idempotency-Key": key,
+      const response = await fetch(
+        `/api/stock-documents/${document.id}/approve`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken,
+            "Idempotency-Key": key,
+          },
+          body: JSON.stringify({ expectedUpdatedAt: document.updatedAt }),
         },
-        body: JSON.stringify({ expectedUpdatedAt: document.updatedAt }),
-      });
+      );
       if (!response.ok) {
         sessionStorage.removeItem(storageKey);
         throw new Error(await localErrorMessage(response));
@@ -915,9 +1296,11 @@ function DocumentDetail({
       setDocument(updated);
       onSuccess("Belge onaylandı ve stok hareketi kaydedildi.");
     } catch (cause) {
-      setError(cause instanceof Error
-        ? `${cause.message} Yanıt alınamadıysa aynı güvenli anahtarla tekrar deneyebilirsiniz.`
-        : "Onay sonucu alınamadı. Aynı güvenli anahtarla tekrar deneyin.");
+      setError(
+        cause instanceof Error
+          ? `${cause.message} Yanıt alınamadıysa aynı güvenli anahtarla tekrar deneyebilirsiniz.`
+          : "Onay sonucu alınamadı. Aynı güvenli anahtarla tekrar deneyin.",
+      );
     } finally {
       setWorking(false);
     }
@@ -939,49 +1322,127 @@ function DocumentDetail({
       />
     );
   }
-  const listPath = document.type === "RECEIPT" ? "/stock/receipts" : "/stock/issues";
+  const listPath =
+    document.type === "RECEIPT" ? "/stock/receipts" : "/stock/issues";
   return (
     <section>
       <header className="page-header">
         <div>
-          <h1>{documentTypeLabel(document.type)} {formatDocumentNumber(document)}</h1>
+          <h1>
+            {documentTypeLabel(document.type)} {formatDocumentNumber(document)}
+          </h1>
           <p>{documentStatusLabel(document.status)}</p>
         </div>
         {canWrite && document.status === "DRAFT" && (
           <div className="header-actions">
-            <Link className="secondary-button link-button" href={`/stock-documents/${id}/edit`} navigate={navigate}>Düzenle</Link>
-            <button className="secondary-button" type="button" onClick={() => void cancelDraft()} disabled={working}>Taslağı iptal et</button>
-            <button className="primary-button" type="button" onClick={() => void approveDraft()} disabled={working}>{working ? "Onaylanıyor…" : "Belgeyi onayla"}</button>
+            <Link
+              className="secondary-button link-button"
+              href={`/stock-documents/${id}/edit`}
+              navigate={navigate}
+            >
+              Düzenle
+            </Link>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => void cancelDraft()}
+              disabled={working}
+            >
+              Taslağı iptal et
+            </button>
+            <button
+              className="primary-button"
+              type="button"
+              onClick={() => void approveDraft()}
+              disabled={working}
+            >
+              {working ? "Onaylanıyor…" : "Belgeyi onayla"}
+            </button>
           </div>
         )}
       </header>
       {error && <ErrorMessage>{error}</ErrorMessage>}
       <dl className="details-grid">
-        <Detail label="Depo" value={`${document.warehouse.code} · ${document.warehouse.name}`} />
+        <Detail
+          label="Depo"
+          value={`${document.warehouse.code} · ${document.warehouse.name}`}
+        />
         <Detail label="Belge referansı" value={document.reference ?? "—"} />
         <Detail label="Oluşturulma" value={formatDate(document.createdAt)} />
         <Detail label="Oluşturan" value={document.createdBy.displayName} />
         <Detail label="Tedarikçi" value={document.supplier?.name ?? "—"} />
         <Detail label="Açıklama" value={document.description ?? "—"} />
-        {document.approvedAt && <Detail label="Onaylanma" value={`${formatDate(document.approvedAt)} · ${document.approvedBy?.displayName ?? ""}`} />}
-        {document.cancelledAt && <Detail label="İptal" value={`${formatDate(document.cancelledAt)} · ${document.cancelledBy?.displayName ?? ""}`} />}
+        {document.approvedAt && (
+          <Detail
+            label="Onaylanma"
+            value={`${formatDate(document.approvedAt)} · ${document.approvedBy?.displayName ?? ""}`}
+          />
+        )}
+        {document.cancelledAt && (
+          <Detail
+            label="İptal"
+            value={`${formatDate(document.cancelledAt)} · ${document.cancelledBy?.displayName ?? ""}`}
+          />
+        )}
       </dl>
+      {role === "ADMIN" &&
+        document.status === "APPROVED" &&
+        !reversed &&
+        !document.isReversed && (
+          <div className="form-actions">
+            <button
+              className="secondary-button"
+              disabled={working}
+              onClick={() => void reverseDocument()}
+            >
+              {reversal
+                ? "Terslemeyi tekrar dene"
+                : "Belgeyi ters hareketle düzelt"}
+            </button>
+          </div>
+        )}
+      {(reversed || document.isReversed) && (
+        <p role="status">Belgenin stok etkisi terslendi.</p>
+      )}
       <h2>Ürün satırları</h2>
       <div className="table-wrap">
         <table>
-          <thead><tr><th scope="col">SKU</th><th scope="col">Ürün</th><th scope="col">Birim</th><th scope="col">Miktar</th><th scope="col">Satır açıklaması</th></tr></thead>
-          <tbody>{document.lines.map((line) => (
-            <tr key={line.id}><td>{line.product.sku}</td><td>{line.product.name}</td><td>{unitLabel(line.unit)}</td><td className="quantity-cell">{line.quantity}</td><td>{line.description ?? "—"}</td></tr>
-          ))}</tbody>
+          <thead>
+            <tr>
+              <th scope="col">SKU</th>
+              <th scope="col">Ürün</th>
+              <th scope="col">Birim</th>
+              <th scope="col">Miktar</th>
+              <th scope="col">Satır açıklaması</th>
+            </tr>
+          </thead>
+          <tbody>
+            {document.lines.map((line) => (
+              <tr key={line.id}>
+                <td>{line.product.sku}</td>
+                <td>{line.product.name}</td>
+                <td>{unitLabel(line.unit)}</td>
+                <td className="quantity-cell">{line.quantity}</td>
+                <td>{line.description ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
         </table>
       </div>
-      <Link className="back-link" href={listPath} navigate={navigate}>← Belge listesine dön</Link>
+      <Link className="back-link" href={listPath} navigate={navigate}>
+        ← Belge listesine dön
+      </Link>
     </section>
   );
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
-  return <div className="detail"><dt>{label}</dt><dd>{value}</dd></div>;
+  return (
+    <div className="detail">
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
 }
 
 function MovementsPage({ csrfToken }: { csrfToken: string }) {
@@ -1000,64 +1461,207 @@ function MovementsPage({ csrfToken }: { csrfToken: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    const params = new URLSearchParams({ page: "1", pageSize: "50", isActive: "true", sort: "sku" });
+    const params = new URLSearchParams({
+      page: "1",
+      pageSize: "50",
+      isActive: "true",
+      sort: "sku",
+    });
     if (productQuery.trim()) params.set("q", productQuery.trim());
     api<Page<Product>>(`/api/products?${params}`, csrfToken)
-      .then((result) => { if (!cancelled) setProducts(result.items); })
-      .catch((cause: unknown) => { if (!cancelled) setError(cause instanceof Error ? cause.message : "Ürünler yüklenemedi."); });
-    return () => { cancelled = true; };
+      .then((result) => {
+        if (!cancelled) setProducts(result.items);
+      })
+      .catch((cause: unknown) => {
+        if (!cancelled)
+          setError(
+            cause instanceof Error ? cause.message : "Ürünler yüklenemedi.",
+          );
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [productQuery, csrfToken]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError("");
-    const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE), directionOrder: "desc" });
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(PAGE_SIZE),
+      directionOrder: "desc",
+    });
     if (warehouseId) params.set("warehouseId", warehouseId);
     if (productId) params.set("productId", productId);
     if (direction) params.set("direction", direction);
     if (from) params.set("from", new Date(`${from}T00:00:00`).toISOString());
     if (to) params.set("to", new Date(`${to}T23:59:59.999`).toISOString());
     api<Page<MovementItem>>(`/api/stock-movements?${params}`, csrfToken)
-      .then((result) => { if (!cancelled) setData(result); })
-      .catch((cause: unknown) => { if (!cancelled) setError(cause instanceof Error ? cause.message : "Stok hareketleri yüklenemedi."); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .then((result) => {
+        if (!cancelled) setData(result);
+      })
+      .catch((cause: unknown) => {
+        if (!cancelled)
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : "Stok hareketleri yüklenemedi.",
+          );
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [page, warehouseId, productId, direction, from, to, csrfToken]);
 
   return (
     <section>
-      <header className="page-header"><div><h1>Hareketler</h1><p>Stok giriş ve çıkış geçmişi</p></div></header>
+      <header className="page-header">
+        <div>
+          <h1>Hareketler</h1>
+          <p>Stok giriş ve çıkış geçmişi</p>
+        </div>
+      </header>
       {warehouseError && <ErrorMessage>{warehouseError}</ErrorMessage>}
       <div className="stock-filter-bar movement-filters">
-        <label>Depo<select value={warehouseId} onChange={(event) => { setPage(1); setWarehouseId(event.target.value); }}><option value="">Yetkili tüm depolar</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.code} · {warehouse.name}</option>)}</select></label>
-        <label>Ürün ara<input value={productQuery} maxLength={120} onChange={(event) => { setPage(1); setProductQuery(event.target.value); setProductId(""); }} /></label>
-        <label>Ürün<select value={productId} onChange={(event) => { setPage(1); setProductId(event.target.value); }}><option value="">Tüm ürünler</option>{products.map((product) => <option key={product.id} value={product.id}>{product.sku} · {product.name}</option>)}</select></label>
-        <label>Yön<select value={direction} onChange={(event) => { setPage(1); setDirection(event.target.value); }}><option value="">Tümü</option><option value="IN">Giriş</option><option value="OUT">Çıkış</option></select></label>
-        <label>Başlangıç<input type="date" value={from} onChange={(event) => { setPage(1); setFrom(event.target.value); }} /></label>
-        <label>Bitiş<input type="date" value={to} onChange={(event) => { setPage(1); setTo(event.target.value); }} /></label>
+        <label>
+          Depo
+          <select
+            value={warehouseId}
+            onChange={(event) => {
+              setPage(1);
+              setWarehouseId(event.target.value);
+            }}
+          >
+            <option value="">Yetkili tüm depolar</option>
+            {warehouses.map((warehouse) => (
+              <option key={warehouse.id} value={warehouse.id}>
+                {warehouse.code} · {warehouse.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Ürün ara
+          <input
+            value={productQuery}
+            maxLength={120}
+            onChange={(event) => {
+              setPage(1);
+              setProductQuery(event.target.value);
+              setProductId("");
+            }}
+          />
+        </label>
+        <label>
+          Ürün
+          <select
+            value={productId}
+            onChange={(event) => {
+              setPage(1);
+              setProductId(event.target.value);
+            }}
+          >
+            <option value="">Tüm ürünler</option>
+            {products.map((product) => (
+              <option key={product.id} value={product.id}>
+                {product.sku} · {product.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Yön
+          <select
+            value={direction}
+            onChange={(event) => {
+              setPage(1);
+              setDirection(event.target.value);
+            }}
+          >
+            <option value="">Tümü</option>
+            <option value="IN">Giriş</option>
+            <option value="OUT">Çıkış</option>
+          </select>
+        </label>
+        <label>
+          Başlangıç
+          <input
+            type="date"
+            value={from}
+            onChange={(event) => {
+              setPage(1);
+              setFrom(event.target.value);
+            }}
+          />
+        </label>
+        <label>
+          Bitiş
+          <input
+            type="date"
+            value={to}
+            onChange={(event) => {
+              setPage(1);
+              setTo(event.target.value);
+            }}
+          />
+        </label>
       </div>
-      {loading ? <Loading /> : error ? <ErrorMessage>{error}</ErrorMessage> : data?.items.length ? (
+      {loading ? (
+        <Loading />
+      ) : error ? (
+        <ErrorMessage>{error}</ErrorMessage>
+      ) : data?.items.length ? (
         <>
           <div className="table-wrap">
             <table>
-              <thead><tr><th scope="col">Tarih</th><th scope="col">Belge</th><th scope="col">Ürün</th><th scope="col">Depo</th><th scope="col">Yön</th><th scope="col">Miktar</th><th scope="col">İşlem yapan</th></tr></thead>
-              <tbody>{data.items.map((item) => (
-                <tr key={item.id}>
-                  <td>{formatDate(item.createdAt)}</td>
-                  <td>{item.document ? `${item.document.type === "RECEIPT" ? "GI" : "GC"}-${item.document.documentNumber.padStart(8, "0")}${item.document.reference ? ` · ${item.document.reference}` : ""}` : "—"}</td>
-                  <td>{item.product.sku} · {item.product.name}</td>
-                  <td>{item.warehouse.code} · {item.warehouse.name}</td>
-                  <td>{item.direction === "IN" ? "Giriş" : "Çıkış"}</td>
-                  <td className="quantity-cell">{item.quantity}</td>
-                  <td>{item.createdBy.displayName}</td>
+              <thead>
+                <tr>
+                  <th scope="col">Tarih</th>
+                  <th scope="col">Belge</th>
+                  <th scope="col">Ürün</th>
+                  <th scope="col">Depo</th>
+                  <th scope="col">Yön</th>
+                  <th scope="col">Miktar</th>
+                  <th scope="col">İşlem yapan</th>
                 </tr>
-              ))}</tbody>
+              </thead>
+              <tbody>
+                {data.items.map((item) => (
+                  <tr key={item.id}>
+                    <td>{formatDate(item.createdAt)}</td>
+                    <td>
+                      {item.document
+                        ? `${item.document.type === "RECEIPT" ? "GI" : "GC"}-${item.document.documentNumber.padStart(8, "0")}${item.document.reference ? ` · ${item.document.reference}` : ""}`
+                        : "—"}
+                    </td>
+                    <td>
+                      {item.product.sku} · {item.product.name}
+                    </td>
+                    <td>
+                      {item.warehouse.code} · {item.warehouse.name}
+                    </td>
+                    <td>{item.direction === "IN" ? "Giriş" : "Çıkış"}</td>
+                    <td className="quantity-cell">{item.quantity}</td>
+                    <td>{item.createdBy.displayName}</td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
-          <Pagination page={data.page} pageSize={data.pageSize} total={data.total} onPage={setPage} />
+          <Pagination
+            page={data.page}
+            pageSize={data.pageSize}
+            total={data.total}
+            onPage={setPage}
+          />
         </>
-      ) : <Empty>Bu ölçütlere uygun stok hareketi yok.</Empty>}
+      ) : (
+        <Empty>Bu ölçütlere uygun stok hareketi yok.</Empty>
+      )}
     </section>
   );
 }

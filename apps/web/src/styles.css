@@ -1,5 +1,9 @@
 :root {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
     sans-serif;
   color: #202b32;
   background: #f5f7f8;
@@ -604,5 +608,62 @@ td:first-child {
 
   .detail:last-child {
     border-bottom: 0;
+  }
+}
+
+/* Operational workspaces share the same table and form rhythm as the catalogue. */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 1rem;
+  padding: 1rem;
+  margin: 0 0 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  background: #fff;
+}
+.filters > label {
+  flex: 1 1 12rem;
+}
+.filters > .checkbox-label {
+  flex: 0 1 auto;
+  min-height: 2.65rem;
+}
+.content button:not([class]) {
+  min-height: 2.4rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid #b9c8cf;
+  border-radius: 0.35rem;
+  color: #294757;
+  background: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+.content button:not([class]):hover:not(:disabled) {
+  background: #edf2f4;
+}
+.content .pagination {
+  margin-bottom: 1.8rem;
+}
+.content fieldset {
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  padding: 1rem;
+}
+.content details pre {
+  white-space: pre-wrap;
+  max-width: 32rem;
+  overflow-wrap: anywhere;
+}
+.table-wrap td input {
+  min-width: 8rem;
+}
+@media (max-width: 640px) {
+  .filters {
+    padding: 0.8rem;
+  }
+  .filters > label {
+    flex-basis: 100%;
   }
 }

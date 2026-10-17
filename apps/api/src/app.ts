@@ -1,3 +1,4 @@
+import { registerOperationsRoutes } from "./modules/operations/operations-routes.js";
 import Fastify, { type FastifyInstance } from "fastify";
 import { closeDatabase } from "./database/prisma.js";
 import { AuthorizationError } from "./modules/auth/authorization.js";
@@ -18,7 +19,19 @@ export function buildApp(
   catalogPrisma?: PrismaClient,
 ): FastifyInstance {
   const app = Fastify({
-    logger: true,
+    logger: {
+      redact: {
+        paths: [
+          "req.headers.cookie",
+          "req.headers.authorization",
+          'req.headers["x-csrf-token"]',
+          "password",
+          "passwordHash",
+          "token",
+        ],
+        censor: "[REDACTED]",
+      },
+    },
   });
 
   app.decorateRequest("authenticatedUser", null);
@@ -32,6 +45,7 @@ export function buildApp(
   registerStockRoutes(app, catalogPrisma);
   registerTransferRoutes(app, catalogPrisma);
   registerCountRoutes(app, catalogPrisma);
+  registerOperationsRoutes(app, catalogPrisma);
 
   app.addHook("onClose", async () => {
     await closeDatabase();
@@ -96,6 +110,21 @@ export function buildApp(
       });
     }
 
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "P2002"
+    ) {
+      return reply
+        .code(409)
+        .send({
+          error: {
+            code: "CONFLICT",
+            message: "Bu kod veya kullanıcı adı zaten kullanılıyor.",
+          },
+        });
+    }
     request.log.error({ err: error }, "İstek işlenirken beklenmeyen hata");
     return reply.code(500).send({
       error: {

@@ -18,13 +18,14 @@
     "lint": "eslint .",
     "test": "npm run test --workspace=apps/api",
     "auth:create-admin": "node --env-file-if-exists=.env --import tsx apps/api/src/modules/auth/create-admin.ts",
-    "test:db": "node --env-file-if-exists=.env --import tsx --test apps/api/src/database/postgres.integration.test.ts apps/api/src/modules/auth/initial-admin.integration.test.ts apps/api/src/modules/catalog/catalog.integration.test.ts apps/api/src/modules/inventory/stock-routes.integration.test.ts apps/api/src/modules/inventory/transfer-routes.integration.test.ts apps/api/src/modules/inventory/count-routes.integration.test.ts",
+    "test:db": "node --env-file-if-exists=.env --import tsx --test --test-concurrency=1 apps/api/src/database/postgres.integration.test.ts apps/api/src/modules/auth/initial-admin.integration.test.ts apps/api/src/modules/catalog/catalog.integration.test.ts apps/api/src/modules/inventory/stock-routes.integration.test.ts apps/api/src/modules/inventory/transfer-routes.integration.test.ts apps/api/src/modules/inventory/count-routes.integration.test.ts apps/api/src/modules/operations/operations.integration.test.ts",
     "db:validate": "prisma validate --config apps/api/prisma.config.ts",
     "db:generate": "prisma generate --config apps/api/prisma.config.ts",
     "db:migrate": "tsx apps/api/prisma/verify-database.ts migrate && prisma migrate deploy --config apps/api/prisma.config.ts",
     "db:seed": "tsx apps/api/prisma/verify-database.ts seed && prisma db seed --config apps/api/prisma.config.ts",
     "db:test:migrate": "tsx apps/api/prisma/verify-database.ts test-migrate && prisma migrate deploy --config apps/api/prisma.test.config.ts",
-    "db:grants": "tsx apps/api/prisma/verify-database.ts grants && tsx apps/api/prisma/verify-database.ts test-grants && tsx apps/api/prisma/apply-database-grants.ts"
+    "db:grants": "tsx apps/api/prisma/verify-database.ts grants && tsx apps/api/prisma/verify-database.ts test-grants && tsx apps/api/prisma/apply-database-grants.ts",
+    "test:browser": "node --env-file-if-exists=.env --import tsx scripts/browser-check.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -34,6 +35,7 @@
     "@vitejs/plugin-react": "6.1.2",
     "eslint": "10.12.0",
     "globals": "17.13.0",
+    "playwright": "1.62.1",
     "typescript": "6.0.3",
     "typescript-eslint": "8.71.1",
     "vite": "8.3.2"

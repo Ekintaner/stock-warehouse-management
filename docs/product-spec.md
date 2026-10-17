@@ -1,3 +1,8 @@
+> **Güncel teslim — 2026-10-17:** Sayım backend ve arayüzü, belge tam terslemesi,
+> tedarikçiler, kullanıcı/depo atamaları, minimum stok, stok/dönem raporları,
+> CSV, denetim ve defter/bakiye kontrolü uygulanmıştır. Aşağıdaki eski aşama
+> notları tarihseldir; güncel kapsam README ve doğrulama raporundadır.
+
 # Ürün gereksinimleri
 
 ## 1. Amaç ve ilk sürüm sınırı

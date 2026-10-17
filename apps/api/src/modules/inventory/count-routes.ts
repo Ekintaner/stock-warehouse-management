@@ -58,7 +58,10 @@ function ensureAdmin(user: AuthenticatedUser): void {
   }
 }
 
-function normalizeText(value: string | null | undefined, max: number): string | null {
+function normalizeText(
+  value: string | null | undefined,
+  max: number,
+): string | null {
   if (value == null) return null;
   const text = value.trim();
   if (text.length > max) invalid(`Metin en fazla ${max} karakter olabilir.`);
@@ -68,7 +71,9 @@ function normalizeText(value: string | null | undefined, max: number): string | 
 function parseCountedQuantity(raw: string, unit: Unit): Prisma.Decimal {
   const cleaned = raw.trim().replace(",", ".");
   if (!/^\d{1,15}(?:\.\d{1,3})?$/.test(cleaned)) {
-    invalid("Sayılan miktar pozitif veya sıfır olmalı ve en fazla üç ondalık basamak içermelidir.");
+    invalid(
+      "Sayılan miktar pozitif veya sıfır olmalı ve en fazla üç ondalık basamak içermelidir.",
+    );
   }
   const quantity = new Prisma.Decimal(cleaned);
   if (quantity.lt(0)) {
@@ -90,7 +95,9 @@ function expectedDate(value: string): Date {
 
 function ensureNotStale(actual: Date, expected: string): void {
   if (actual.getTime() !== expectedDate(expected).getTime()) {
-    conflict("Sayım başka bir kullanıcı tarafından değiştirildi. Güncel verileri yeniden açın.");
+    conflict(
+      "Sayım başka bir kullanıcı tarafından değiştirildi. Güncel verileri yeniden açın.",
+    );
   }
 }
 
@@ -236,9 +243,12 @@ async function readIdempotentResult(
       userId_operationScope_key: { userId, operationScope: scope, key },
     },
   });
-  if (!prior) conflict("İşlem sonucu doğrulanamadı. Aynı anahtarla tekrar deneyin.");
+  if (!prior)
+    conflict("İşlem sonucu doğrulanamadı. Aynı anahtarla tekrar deneyin.");
   if (prior.requestHash !== requestHash) {
-    conflict("Bu güvenli tekrar anahtarı farklı bir sayım isteğinde kullanılmış.");
+    conflict(
+      "Bu güvenli tekrar anahtarı farklı bir sayım isteğinde kullanılmış.",
+    );
   }
   if (!prior.completedAt || !prior.response) {
     conflict("İşlem sonucu tamamlanmamış. Aynı anahtarla tekrar deneyin.");
@@ -294,15 +304,12 @@ const updateLinesOptions: RouteShorthandOptions = {
           maxItems: 500,
           items: {
             type: "object",
-            required: ["lineId"],
+            required: ["lineId", "countedQuantity"],
             additionalProperties: false,
             properties: {
               lineId: { type: "string", format: "uuid" },
               countedQuantity: {
-                anyOf: [
-                  { type: "string", maxLength: 30 },
-                  { type: "null" },
-                ],
+                anyOf: [{ type: "string", maxLength: 30 }, { type: "null" }],
               },
             },
           },
@@ -404,9 +411,15 @@ export function registerCountRoutes(
         include: {
           warehouse: { select: { id: true, code: true, name: true } },
           openedBy: { select: { id: true, username: true, displayName: true } },
-          responsibleUser: { select: { id: true, username: true, displayName: true } },
-          approvedBy: { select: { id: true, username: true, displayName: true } },
-          cancelledBy: { select: { id: true, username: true, displayName: true } },
+          responsibleUser: {
+            select: { id: true, username: true, displayName: true },
+          },
+          approvedBy: {
+            select: { id: true, username: true, displayName: true },
+          },
+          cancelledBy: {
+            select: { id: true, username: true, displayName: true },
+          },
           _count: { select: { lines: true } },
         },
       }),
@@ -424,10 +437,12 @@ export function registerCountRoutes(
         })
       : [];
     const countedMap = new Map<string, number>(
-      countedAggregations.map((a: { countId: string; _count: { id: number } }) => [
-        a.countId,
-        a._count.id,
-      ]),
+      countedAggregations.map(
+        (a: { countId: string; _count: { id: number } }) => [
+          a.countId,
+          a._count.id,
+        ],
+      ),
     );
 
     return {
@@ -468,182 +483,241 @@ export function registerCountRoutes(
       page?: number | string;
       pageSize?: number | string;
     };
-  }>("/api/counts/:id", async (request) => {
-    const user = currentUser(request);
-    const db = getDb();
-    const count = await db.stockCount.findUnique({
-      where: { id: request.params.id },
-      include: {
-        warehouse: { select: { id: true, code: true, name: true, isActive: true } },
-        openedBy: { select: { id: true, username: true, displayName: true } },
-        responsibleUser: { select: { id: true, username: true, displayName: true } },
-        approvedBy: { select: { id: true, username: true, displayName: true } },
-        cancelledBy: { select: { id: true, username: true, displayName: true } },
+  }>(
+    "/api/counts/:id",
+    {
+      schema: {
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string", format: "uuid" } },
+        },
+        querystring: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            q: { type: "string", maxLength: 120 },
+            filter: {
+              type: "string",
+              enum: ["all", "uncounted", "difference"],
+            },
+            page: { type: "integer", minimum: 1, maximum: 100000 },
+            pageSize: { type: "integer", minimum: 1, maximum: 100 },
+          },
+        },
       },
-    });
-    if (!count) notFound();
-    canReadWarehouse(user, count.warehouseId);
+    },
+    async (request) => {
+      const user = currentUser(request);
+      const db = getDb();
+      const count = await db.stockCount.findUnique({
+        where: { id: request.params.id },
+        include: {
+          warehouse: {
+            select: { id: true, code: true, name: true, isActive: true },
+          },
+          openedBy: { select: { id: true, username: true, displayName: true } },
+          responsibleUser: {
+            select: { id: true, username: true, displayName: true },
+          },
+          approvedBy: {
+            select: { id: true, username: true, displayName: true },
+          },
+          cancelledBy: {
+            select: { id: true, username: true, displayName: true },
+          },
+        },
+      });
+      if (!count) notFound();
+      canReadWarehouse(user, count.warehouseId);
 
-    // Load all lines for summary stats
-    const allLines = await db.stockCountLine.findMany({
-      where: { countId: count.id },
-      select: {
-        id: true,
-        snapshotQuantity: true,
-        countedQuantity: true,
-      },
-    });
+      // Load all lines for summary stats
+      const allLines = await db.stockCountLine.findMany({
+        where: { countId: count.id },
+        select: {
+          id: true,
+          snapshotQuantity: true,
+          countedQuantity: true,
+        },
+      });
 
-    let countedLinesCount = 0;
-    let uncountedLinesCount = 0;
-    let differenceLinesCount = 0;
-    let positiveCount = 0;
-    let negativeCount = 0;
-    let zeroCount = 0;
+      let countedLinesCount = 0;
+      let uncountedLinesCount = 0;
+      let differenceLinesCount = 0;
+      let positiveCount = 0;
+      let negativeCount = 0;
+      let zeroCount = 0;
 
-    for (const line of allLines) {
-      if (line.countedQuantity === null) {
-        uncountedLinesCount++;
-      } else {
-        countedLinesCount++;
-        const diff = line.countedQuantity.minus(line.snapshotQuantity);
-        if (diff.gt(0)) {
-          positiveCount++;
-          differenceLinesCount++;
-        } else if (diff.lt(0)) {
-          negativeCount++;
-          differenceLinesCount++;
+      for (const line of allLines) {
+        if (line.countedQuantity === null) {
+          uncountedLinesCount++;
         } else {
-          zeroCount++;
+          countedLinesCount++;
+          const diff = line.countedQuantity.minus(line.snapshotQuantity);
+          if (diff.gt(0)) {
+            positiveCount++;
+            differenceLinesCount++;
+          } else if (diff.lt(0)) {
+            negativeCount++;
+            differenceLinesCount++;
+          } else {
+            zeroCount++;
+          }
         }
       }
-    }
 
-    const { page, pageSize, skip, take } = pageArgs(request.query);
-    const q = request.query.q?.trim().toLowerCase();
-    const filter = request.query.filter ?? "all";
+      const { page, pageSize, skip, take } = pageArgs(request.query);
+      const q = request.query.q?.trim().toLowerCase();
+      const filter = request.query.filter ?? "all";
 
-    const lineWhere: Prisma.StockCountLineWhereInput = {
-      countId: count.id,
-      ...(q
-        ? {
-            product: {
-              OR: [
-                { sku: { contains: q, mode: "insensitive" } },
-                { name: { contains: q, mode: "insensitive" } },
-              ],
-            },
-          }
-        : {}),
-      ...(filter === "uncounted"
-        ? { countedQuantity: null }
-        : {}),
-    };
+      const lineWhere: Prisma.StockCountLineWhereInput = {
+        countId: count.id,
+        ...(q
+          ? {
+              product: {
+                OR: [
+                  { sku: { contains: q, mode: "insensitive" } },
+                  { name: { contains: q, mode: "insensitive" } },
+                ],
+              },
+            }
+          : {}),
+        ...(filter === "uncounted" ? { countedQuantity: null } : {}),
+      };
 
-    let pagedLines;
-    let linesTotal: number;
+      let pagedLines;
+      let linesTotal: number;
 
-    if (filter === "difference") {
-      const candidates = await db.stockCountLine.findMany({
-        where: {
-          countId: count.id,
-          countedQuantity: { not: null },
-          ...(q
-            ? {
-                product: {
-                  OR: [
-                    { sku: { contains: q, mode: "insensitive" } },
-                    { name: { contains: q, mode: "insensitive" } },
-                  ],
-                },
-              }
-            : {}),
-        },
-        include: {
-          product: { select: { id: true, sku: true, name: true, unit: true, isActive: true } },
-        },
-        orderBy: [{ product: { sku: "asc" } }, { id: "asc" }],
-      });
-      const diffLines = candidates.filter(
-        (l: { countedQuantity: Prisma.Decimal | null; snapshotQuantity: Prisma.Decimal }) =>
-          l.countedQuantity !== null && !l.countedQuantity.equals(l.snapshotQuantity),
-      );
-      linesTotal = diffLines.length;
-      pagedLines = diffLines.slice(skip, skip + take);
-    } else {
-      const [totalCount, fetched] = await Promise.all([
-        db.stockCountLine.count({ where: lineWhere }),
-        db.stockCountLine.findMany({
-          where: lineWhere,
-          skip,
-          take,
-          orderBy: [{ product: { sku: "asc" } }, { id: "asc" }],
-          include: {
-            product: { select: { id: true, sku: true, name: true, unit: true, isActive: true } },
+      if (filter === "difference") {
+        const candidates = await db.stockCountLine.findMany({
+          where: {
+            countId: count.id,
+            countedQuantity: { not: null },
+            ...(q
+              ? {
+                  product: {
+                    OR: [
+                      { sku: { contains: q, mode: "insensitive" } },
+                      { name: { contains: q, mode: "insensitive" } },
+                    ],
+                  },
+                }
+              : {}),
           },
-        }),
-      ]);
-      linesTotal = totalCount;
-      pagedLines = fetched;
-    }
+          include: {
+            product: {
+              select: {
+                id: true,
+                sku: true,
+                name: true,
+                unit: true,
+                isActive: true,
+              },
+            },
+          },
+          orderBy: [{ product: { sku: "asc" } }, { id: "asc" }],
+        });
+        const diffLines = candidates.filter(
+          (l: {
+            countedQuantity: Prisma.Decimal | null;
+            snapshotQuantity: Prisma.Decimal;
+          }) =>
+            l.countedQuantity !== null &&
+            !l.countedQuantity.equals(l.snapshotQuantity),
+        );
+        linesTotal = diffLines.length;
+        pagedLines = diffLines.slice(skip, skip + take);
+      } else {
+        const [totalCount, fetched] = await Promise.all([
+          db.stockCountLine.count({ where: lineWhere }),
+          db.stockCountLine.findMany({
+            where: lineWhere,
+            skip,
+            take,
+            orderBy: [{ product: { sku: "asc" } }, { id: "asc" }],
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  sku: true,
+                  name: true,
+                  unit: true,
+                  isActive: true,
+                },
+              },
+            },
+          }),
+        ]);
+        linesTotal = totalCount;
+        pagedLines = fetched;
+      }
 
-    return {
-      count: {
-        id: count.id,
-        countNumber: count.countNumber.toString(),
-        warehouseId: count.warehouseId,
-        status: count.status,
-        description: count.description,
-        startedAt: count.startedAt.toISOString(),
-        closedAt: count.closedAt?.toISOString() ?? null,
-        approvedAt: count.approvedAt?.toISOString() ?? null,
-        cancelledAt: count.cancelledAt?.toISOString() ?? null,
-        updatedAt: count.updatedAt.toISOString(),
-        warehouse: count.warehouse,
-        openedBy: count.openedBy,
-        responsibleUser: count.responsibleUser,
-        approvedBy: count.approvedBy,
-        cancelledBy: count.cancelledBy,
-      },
-      stats: {
-        totalLines: allLines.length,
-        countedLines: countedLinesCount,
-        uncountedLines: uncountedLinesCount,
-        differenceLines: differenceLinesCount,
-        positiveCount,
-        negativeCount,
-        zeroCount,
-      },
-      lines: pagedLines.map((line: {
-        id: string;
-        productId: string;
-        unit: Unit;
-        snapshotQuantity: Prisma.Decimal;
-        countedQuantity: Prisma.Decimal | null;
-        product: { id: string; sku: string; name: string; unit: Unit; isActive: boolean };
-      }) => {
-        const diff =
-          line.countedQuantity !== null
-            ? line.countedQuantity.minus(line.snapshotQuantity).toFixed(3)
-            : null;
-        return {
-          id: line.id,
-          productId: line.productId,
-          unit: line.unit,
-          snapshotQuantity: line.snapshotQuantity.toFixed(3),
-          countedQuantity:
-            line.countedQuantity !== null
-              ? line.countedQuantity.toFixed(3)
-              : null,
-          difference: diff,
-          product: line.product,
-        };
-      }),
-      linesTotal,
-      page,
-      pageSize,
-    };
-  });
+      return {
+        count: {
+          id: count.id,
+          countNumber: count.countNumber.toString(),
+          warehouseId: count.warehouseId,
+          status: count.status,
+          description: count.description,
+          startedAt: count.startedAt.toISOString(),
+          closedAt: count.closedAt?.toISOString() ?? null,
+          approvedAt: count.approvedAt?.toISOString() ?? null,
+          cancelledAt: count.cancelledAt?.toISOString() ?? null,
+          updatedAt: count.updatedAt.toISOString(),
+          warehouse: count.warehouse,
+          openedBy: count.openedBy,
+          responsibleUser: count.responsibleUser,
+          approvedBy: count.approvedBy,
+          cancelledBy: count.cancelledBy,
+        },
+        stats: {
+          totalLines: allLines.length,
+          countedLines: countedLinesCount,
+          uncountedLines: uncountedLinesCount,
+          differenceLines: differenceLinesCount,
+          positiveCount,
+          negativeCount,
+          zeroCount,
+        },
+        lines: pagedLines.map(
+          (line: {
+            id: string;
+            productId: string;
+            unit: Unit;
+            snapshotQuantity: Prisma.Decimal;
+            countedQuantity: Prisma.Decimal | null;
+            product: {
+              id: string;
+              sku: string;
+              name: string;
+              unit: Unit;
+              isActive: boolean;
+            };
+          }) => {
+            const diff =
+              line.countedQuantity !== null
+                ? line.countedQuantity.minus(line.snapshotQuantity).toFixed(3)
+                : null;
+            return {
+              id: line.id,
+              productId: line.productId,
+              unit: line.unit,
+              snapshotQuantity: line.snapshotQuantity.toFixed(3),
+              countedQuantity:
+                line.countedQuantity !== null
+                  ? line.countedQuantity.toFixed(3)
+                  : null,
+              difference: diff,
+              product: line.product,
+            };
+          },
+        ),
+        linesTotal,
+        page,
+        pageSize,
+      };
+    },
+  );
 
   /**
    * POST /api/counts
@@ -663,109 +737,130 @@ export function registerCountRoutes(
 
     canWriteWarehouse(user, warehouseId);
 
-    const result = await db.$transaction(async (tx: Prisma.TransactionClient) => {
-      // 1. Lock warehouse row FOR UPDATE
-      await lockWarehouse(tx, warehouseId);
+    const result = await db.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        // 1. Lock warehouse row FOR UPDATE
+        await lockWarehouse(tx, warehouseId);
 
-      const warehouse = await tx.warehouse.findUnique({
-        where: { id: warehouseId },
-        select: { id: true, code: true, name: true, isActive: true },
-      });
-      if (!warehouse) notFound("Depo bulunamadı.");
-      if (!warehouse.isActive) {
-        conflict("Pasif depoda sayım açılamaz.");
-      }
-
-      // Verify responsible user
-      const responsible = await tx.user.findUnique({
-        where: { id: responsibleUserId },
-        select: { id: true, role: true, isActive: true },
-      });
-      if (!responsible || !responsible.isActive) {
-        invalid("Seçilen sorumlu kullanıcı bulunamadı veya pasif durumda.");
-      }
-
-      // Check if open count exists
-      const existingOpen = await tx.stockCount.findFirst({
-        where: { warehouseId, status: "OPEN" },
-        select: { id: true, countNumber: true },
-      });
-      if (existingOpen) {
-        conflict("Bu depoda zaten açık bir sayım bulunmaktadır.", {
-          countId: existingOpen.id,
-          countNumber: existingOpen.countNumber.toString(),
+        const warehouse = await tx.warehouse.findUnique({
+          where: { id: warehouseId },
+          select: { id: true, code: true, name: true, isActive: true },
         });
-      }
-
-      // 2. Gather products to include in the count snapshot:
-      // Policy:
-      // - All active products (Product.isActive = true)
-      // - PLUS inactive products that have positive balance (quantity > 0) in this warehouse.
-      const activeProducts = await tx.product.findMany({
-        where: { isActive: true },
-        select: { id: true, unit: true, sku: true, name: true },
-      });
-
-      const inactiveProductsWithBalance = await tx.stockBalance.findMany({
-        where: {
-          warehouseId,
-          quantity: { gt: 0 },
-          product: { isActive: false },
-        },
-        select: {
-          product: { select: { id: true, unit: true, sku: true, name: true } },
-        },
-      });
-
-      const productMap = new Map<string, { id: string; unit: Unit; sku: string; name: string }>();
-      for (const p of activeProducts) {
-        productMap.set(p.id, p);
-      }
-      for (const row of inactiveProductsWithBalance) {
-        if (!productMap.has(row.product.id)) {
-          productMap.set(row.product.id, row.product);
+        if (!warehouse) notFound("Depo bulunamadı.");
+        if (!warehouse.isActive) {
+          conflict("Pasif depoda sayım açılamaz.");
         }
-      }
 
-      if (productMap.size === 0) {
-        invalid("Sayım için sayılacak kayıtlı ürün bulunamadı.");
-      }
+        // Verify responsible user
+        const responsible = await tx.user.findUnique({
+          where: { id: responsibleUserId },
+          select: { id: true, role: true, isActive: true },
+        });
+        if (
+          !responsible ||
+          !responsible.isActive ||
+          responsible.role === "VIEWER"
+        ) {
+          invalid("Seçilen sorumlu kullanıcı bulunamadı veya pasif durumda.");
+        }
 
-      const productIds = Array.from(productMap.keys());
+        if (
+          responsible.role !== "ADMIN" &&
+          !(await tx.userWarehouse.findUnique({
+            where: {
+              userId_warehouseId: { userId: responsibleUserId, warehouseId },
+            },
+          }))
+        ) {
+          invalid("Sayım sorumlusunun bu depoya atanmış olması gerekir.");
+        }
 
-      // 3. Read current stock balances in this warehouse for snapshot
-      const balances = await tx.stockBalance.findMany({
-        where: {
-          warehouseId,
-          productId: { in: productIds },
-        },
-        select: { productId: true, quantity: true },
-      });
-      const balanceMap = new Map<string, Prisma.Decimal>(
-        balances.map((b: { productId: string; quantity: Prisma.Decimal }) => [
-          b.productId,
-          b.quantity,
-        ]),
-      );
+        // Check if open count exists
+        const existingOpen = await tx.stockCount.findFirst({
+          where: { warehouseId, status: "OPEN" },
+          select: { id: true, countNumber: true },
+        });
+        if (existingOpen) {
+          conflict("Bu depoda zaten açık bir sayım bulunmaktadır.", {
+            countId: existingOpen.id,
+            countNumber: existingOpen.countNumber.toString(),
+          });
+        }
 
-      // 4. Create StockCount
-      const cleanDescription = normalizeText(description, 1000);
-      const createdCount = await tx.stockCount.create({
-        data: {
-          warehouseId,
-          status: "OPEN",
-          openedById: user.id,
-          responsibleUserId,
-          description: cleanDescription,
-        },
-      });
+        // 2. Gather products to include in the count snapshot:
+        // Policy:
+        // - All active products (Product.isActive = true)
+        // - PLUS inactive products that have positive balance (quantity > 0) in this warehouse.
+        await tx.$queryRaw`SELECT "id" FROM "Product" ORDER BY "id" FOR SHARE`;
+        const activeProducts = await tx.product.findMany({
+          where: { isActive: true },
+          select: { id: true, unit: true, sku: true, name: true },
+        });
 
-      // 5. Create StockCountLines
-      const lineData = productIds
-        .sort()
-        .map((productId: string) => {
+        const inactiveProductsWithBalance = await tx.stockBalance.findMany({
+          where: {
+            warehouseId,
+            quantity: { gt: 0 },
+            product: { isActive: false },
+          },
+          select: {
+            product: {
+              select: { id: true, unit: true, sku: true, name: true },
+            },
+          },
+        });
+
+        const productMap = new Map<
+          string,
+          { id: string; unit: Unit; sku: string; name: string }
+        >();
+        for (const p of activeProducts) {
+          productMap.set(p.id, p);
+        }
+        for (const row of inactiveProductsWithBalance) {
+          if (!productMap.has(row.product.id)) {
+            productMap.set(row.product.id, row.product);
+          }
+        }
+
+        if (productMap.size === 0) {
+          invalid("Sayım için sayılacak kayıtlı ürün bulunamadı.");
+        }
+
+        const productIds = Array.from(productMap.keys());
+
+        // 3. Read current stock balances in this warehouse for snapshot
+        const balances = await tx.stockBalance.findMany({
+          where: {
+            warehouseId,
+            productId: { in: productIds },
+          },
+          select: { productId: true, quantity: true },
+        });
+        const balanceMap = new Map<string, Prisma.Decimal>(
+          balances.map((b: { productId: string; quantity: Prisma.Decimal }) => [
+            b.productId,
+            b.quantity,
+          ]),
+        );
+
+        // 4. Create StockCount
+        const cleanDescription = normalizeText(description, 1000);
+        const createdCount = await tx.stockCount.create({
+          data: {
+            warehouseId,
+            status: "OPEN",
+            openedById: user.id,
+            responsibleUserId,
+            description: cleanDescription,
+          },
+        });
+
+        // 5. Create StockCountLines
+        const lineData = productIds.sort().map((productId: string) => {
           const product = productMap.get(productId)!;
-          const snapshotQuantity = balanceMap.get(productId) ?? new Prisma.Decimal(0);
+          const snapshotQuantity =
+            balanceMap.get(productId) ?? new Prisma.Decimal(0);
           return {
             countId: createdCount.id,
             productId,
@@ -775,36 +870,30 @@ export function registerCountRoutes(
           };
         });
 
-      await tx.stockCountLine.createMany({
-        data: lineData,
-      });
+        await tx.stockCountLine.createMany({
+          data: lineData,
+        });
 
-      // 6. Write AuditEvent
-      await writeAudit(
-        tx,
-        user.id,
-        "COUNT_OPENED",
-        createdCount.id,
-        null,
-        {
+        // 6. Write AuditEvent
+        await writeAudit(tx, user.id, "COUNT_OPENED", createdCount.id, null, {
           warehouseId,
           countNumber: createdCount.countNumber.toString(),
           totalProducts: productMap.size,
           description: cleanDescription,
-        },
-      );
+        });
 
-      return {
-        id: createdCount.id,
-        countNumber: createdCount.countNumber.toString(),
-        warehouseId,
-        status: createdCount.status,
-        description: createdCount.description,
-        startedAt: createdCount.startedAt.toISOString(),
-        updatedAt: createdCount.updatedAt.toISOString(),
-        totalLines: productMap.size,
-      };
-    });
+        return {
+          id: createdCount.id,
+          countNumber: createdCount.countNumber.toString(),
+          warehouseId,
+          status: createdCount.status,
+          description: createdCount.description,
+          startedAt: createdCount.startedAt.toISOString(),
+          updatedAt: createdCount.updatedAt.toISOString(),
+          totalLines: productMap.size,
+        };
+      },
+    );
 
     return reply.code(201).send(result);
   });
@@ -828,107 +917,121 @@ export function registerCountRoutes(
     const countId = request.params.id;
     const { expectedUpdatedAt, lines } = request.body;
 
-    const result = await db.$transaction(async (tx: Prisma.TransactionClient) => {
-      const countPeek = await tx.stockCount.findUnique({
-        where: { id: countId },
-        select: { warehouseId: true },
-      });
-      if (!countPeek) notFound();
-      await lockWarehouse(tx, countPeek.warehouseId);
+    const result = await db.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        const countPeek = await tx.stockCount.findUnique({
+          where: { id: countId },
+          select: { warehouseId: true },
+        });
+        if (!countPeek) notFound();
+        await lockWarehouse(tx, countPeek.warehouseId);
 
-      // Use the same warehouse -> count lock order as approval and cancellation.
-      const count = await lockCount(tx, countId);
-      canWriteWarehouse(user, count.warehouseId);
+        // Use the same warehouse -> count lock order as approval and cancellation.
+        const count = await lockCount(tx, countId);
+        canWriteWarehouse(user, count.warehouseId);
 
-      if (count.status !== "OPEN") {
-        conflict("Yalnızca açık durumdaki sayımlarda miktar girilebilir.");
-      }
-      ensureNotStale(count.updatedAt, expectedUpdatedAt);
-
-      const lineIds = lines.map((l: { lineId: string }) => l.lineId);
-      const dbLines = await tx.stockCountLine.findMany({
-        where: {
-          id: { in: lineIds },
-          countId,
-        },
-        select: {
-          id: true,
-          unit: true,
-          snapshotQuantity: true,
-          countedQuantity: true,
-        },
-      });
-
-      if (dbLines.length !== lineIds.length) {
-        invalid("Sayım satırlarından biri bulunamadı veya bu sayıma ait değil.");
-      }
-
-      const dbLineMap = new Map(
-        dbLines.map((l: { id: string; unit: Unit; snapshotQuantity: Prisma.Decimal; countedQuantity: Prisma.Decimal | null }) => [
-          l.id,
-          l,
-        ]),
-      );
-
-      // 2. Validate and update each line
-      const updatedLines = [];
-      for (const lineInput of lines) {
-        const dbLine = dbLineMap.get(lineInput.lineId);
-        if (!dbLine) invalid("Sayım satırı bulunamadı.");
-
-        let newCounted: Prisma.Decimal | null = null;
-        if (lineInput.countedQuantity !== null) {
-          newCounted = parseCountedQuantity(lineInput.countedQuantity, dbLine.unit);
+        if (count.status !== "OPEN") {
+          conflict("Yalnızca açık durumdaki sayımlarda miktar girilebilir.");
         }
+        ensureNotStale(count.updatedAt, expectedUpdatedAt);
 
-        const updated = await tx.stockCountLine.update({
-          where: { id: dbLine.id },
-          data: { countedQuantity: newCounted },
+        const lineIds = lines.map((l: { lineId: string }) => l.lineId);
+        const dbLines = await tx.stockCountLine.findMany({
+          where: {
+            id: { in: lineIds },
+            countId,
+          },
           select: {
             id: true,
-            productId: true,
             unit: true,
             snapshotQuantity: true,
             countedQuantity: true,
           },
         });
-        updatedLines.push(updated);
-      }
 
-      // 3. Touch count.updatedAt
-      const touchedCount = await tx.stockCount.update({
-        where: { id: countId },
-        data: { updatedAt: new Date() },
-        select: { updatedAt: true },
-      });
+        if (dbLines.length !== lineIds.length) {
+          invalid(
+            "Sayım satırlarından biri bulunamadı veya bu sayıma ait değil.",
+          );
+        }
 
-      // 4. Audit
-      await writeAudit(
-        tx,
-        user.id,
-        "COUNT_LINES_UPDATED",
-        countId,
-        { lineCount: lines.length },
-        { lineCount: lines.length, updatedAt: touchedCount.updatedAt.toISOString() },
-      );
+        const dbLineMap = new Map(
+          dbLines.map(
+            (l: {
+              id: string;
+              unit: Unit;
+              snapshotQuantity: Prisma.Decimal;
+              countedQuantity: Prisma.Decimal | null;
+            }) => [l.id, l],
+          ),
+        );
 
-      return {
-        id: countId,
-        updatedAt: touchedCount.updatedAt.toISOString(),
-        updatedLines: updatedLines.map((l) => ({
-          id: l.id,
-          productId: l.productId,
-          unit: l.unit,
-          snapshotQuantity: l.snapshotQuantity.toFixed(3),
-          countedQuantity:
-            l.countedQuantity !== null ? l.countedQuantity.toFixed(3) : null,
-          difference:
-            l.countedQuantity !== null
-              ? l.countedQuantity.minus(l.snapshotQuantity).toFixed(3)
-              : null,
-        })),
-      };
-    });
+        // 2. Validate and update each line
+        const updatedLines = [];
+        for (const lineInput of lines) {
+          const dbLine = dbLineMap.get(lineInput.lineId);
+          if (!dbLine) invalid("Sayım satırı bulunamadı.");
+
+          let newCounted: Prisma.Decimal | null = null;
+          if (lineInput.countedQuantity !== null) {
+            newCounted = parseCountedQuantity(
+              lineInput.countedQuantity,
+              dbLine.unit,
+            );
+          }
+
+          const updated = await tx.stockCountLine.update({
+            where: { id: dbLine.id },
+            data: { countedQuantity: newCounted },
+            select: {
+              id: true,
+              productId: true,
+              unit: true,
+              snapshotQuantity: true,
+              countedQuantity: true,
+            },
+          });
+          updatedLines.push(updated);
+        }
+
+        // 3. Touch count.updatedAt
+        const touchedCount = await tx.stockCount.update({
+          where: { id: countId },
+          data: { updatedAt: new Date() },
+          select: { updatedAt: true },
+        });
+
+        // 4. Audit
+        await writeAudit(
+          tx,
+          user.id,
+          "COUNT_LINES_UPDATED",
+          countId,
+          { lineCount: lines.length },
+          {
+            lineCount: lines.length,
+            updatedAt: touchedCount.updatedAt.toISOString(),
+          },
+        );
+
+        return {
+          id: countId,
+          updatedAt: touchedCount.updatedAt.toISOString(),
+          updatedLines: updatedLines.map((l) => ({
+            id: l.id,
+            productId: l.productId,
+            unit: l.unit,
+            snapshotQuantity: l.snapshotQuantity.toFixed(3),
+            countedQuantity:
+              l.countedQuantity !== null ? l.countedQuantity.toFixed(3) : null,
+            difference:
+              l.countedQuantity !== null
+                ? l.countedQuantity.minus(l.snapshotQuantity).toFixed(3)
+                : null,
+          })),
+        };
+      },
+    );
 
     return result;
   });
@@ -995,7 +1098,10 @@ export function registerCountRoutes(
       });
 
       // 4. Validate that ALL lines are counted
-      const uncounted = lines.filter((l: { countedQuantity: Prisma.Decimal | null }) => l.countedQuantity === null);
+      const uncounted = lines.filter(
+        (l: { countedQuantity: Prisma.Decimal | null }) =>
+          l.countedQuantity === null,
+      );
       if (uncounted.length > 0) {
         conflict(
           `Sayım onaylanmadan önce bütün satırlar sayılmış olmalıdır (${uncounted.length} satır eksik).`,

@@ -11,3 +11,5 @@ npm-debug.log*
 *.sql.gz
 *.dump
 *.backup
+# Browser failure diagnostics and local automation output
+browser-failure.png

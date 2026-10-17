@@ -274,7 +274,9 @@ function conflict(message: string): never {
 }
 
 function isAscii(value: string): boolean {
-  return Array.from(value).every((character) => character.charCodeAt(0) <= 0x7f);
+  return Array.from(value).every(
+    (character) => character.charCodeAt(0) <= 0x7f,
+  );
 }
 
 function normalizedCode(value: string, label: string): string {
@@ -319,7 +321,11 @@ function normalizedBarcode(value: string | null | undefined): string | null {
   return barcode;
 }
 
-function normalizedName(value: string, label: string, maxLength: number): string {
+function normalizedName(
+  value: string,
+  label: string,
+  maxLength: number,
+): string {
   const name = value.trim();
   if (!name || name.length > maxLength) {
     invalid(`${label} boş olamaz ve en fazla ${maxLength} karakter olmalıdır.`);
@@ -381,7 +387,9 @@ function uniqueConflict(error: unknown, entity: Mutation): never {
   if (entity === "LOCATION") {
     conflict("Bu depoda aynı raf kodu zaten kullanılıyor.");
   }
-  conflict("Bu kayıt için benzersiz olması gereken bir değer zaten kullanılıyor.");
+  conflict(
+    "Bu kayıt için benzersiz olması gereken bir değer zaten kullanılıyor.",
+  );
 }
 
 async function withUniqueConflict<T>(
@@ -511,7 +519,10 @@ async function isProductUnitInUse(
 ): Promise<boolean> {
   const [movement, documentLine, transferLine, countLine] = await Promise.all([
     tx.stockMovement.findFirst({ where: { productId }, select: { id: true } }),
-    tx.stockDocumentLine.findFirst({ where: { productId }, select: { id: true } }),
+    tx.stockDocumentLine.findFirst({
+      where: { productId },
+      select: { id: true },
+    }),
     tx.transferLine.findFirst({ where: { productId }, select: { id: true } }),
     tx.stockCountLine.findFirst({ where: { productId }, select: { id: true } }),
   ]);
@@ -542,7 +553,10 @@ export async function ensureWarehouseCanBeDeactivated(
     tx.transfer.findFirst({
       where: {
         status: { in: ["DRAFT", "SHIPPED"] },
-        OR: [{ sourceWarehouseId: warehouseId }, { targetWarehouseId: warehouseId }],
+        OR: [
+          { sourceWarehouseId: warehouseId },
+          { targetWarehouseId: warehouseId },
+        ],
       },
       select: { id: true },
     }),
@@ -607,7 +621,9 @@ export function registerCatalogRoutes(
       const [items, total] = await Promise.all([
         databaseClient().product.findMany({
           where,
-          include: { category: { select: { id: true, code: true, name: true } } },
+          include: {
+            category: { select: { id: true, code: true, name: true } },
+          },
           orderBy,
           skip,
           take,
@@ -658,7 +674,9 @@ export function registerCatalogRoutes(
               unit: body.unit,
               isActive: body.isActive ?? true,
             },
-            include: { category: { select: { id: true, code: true, name: true } } },
+            include: {
+              category: { select: { id: true, code: true, name: true } },
+            },
           });
           await writeAudit(
             tx,
@@ -702,8 +720,12 @@ export function registerCatalogRoutes(
           if (body.categoryId && body.categoryId !== before.categoryId) {
             await ensureActiveCategory(tx, body.categoryId, before.categoryId);
           }
+          await tx.$queryRaw`SELECT "id" FROM "Product" WHERE "id"=${before.id}::uuid FOR UPDATE`;
           const nextUnit = body.unit ?? before.unit;
-          if (nextUnit !== before.unit && (await isProductUnitInUse(tx, before.id))) {
+          if (
+            nextUnit !== before.unit &&
+            (await isProductUnitInUse(tx, before.id))
+          ) {
             conflict(
               "Stok veya belge geçmişi bulunan ürünün birimi değiştirilemez.",
             );
@@ -719,7 +741,9 @@ export function registerCatalogRoutes(
             ...(body.description !== undefined
               ? { description: normalizedDescription(body.description) }
               : {}),
-            ...(body.categoryId !== undefined ? { categoryId: nextCategoryId } : {}),
+            ...(body.categoryId !== undefined
+              ? { categoryId: nextCategoryId }
+              : {}),
             ...(body.unit !== undefined ? { unit: body.unit } : {}),
             ...(body.isActive !== undefined ? { isActive: body.isActive } : {}),
             updatedAt: new Date(),
@@ -735,10 +759,12 @@ export function registerCatalogRoutes(
           }
           const after = await tx.product.findUniqueOrThrow({
             where: { id: before.id },
-            include: { category: { select: { id: true, code: true, name: true } } },
+            include: {
+              category: { select: { id: true, code: true, name: true } },
+            },
           });
-          const statusChanged = body.isActive !== undefined &&
-            body.isActive !== before.isActive;
+          const statusChanged =
+            body.isActive !== undefined && body.isActive !== before.isActive;
           await writeAudit(
             tx,
             user.id,
@@ -863,7 +889,13 @@ export function registerCatalogRoutes(
                 ? { code: normalizedCode(request.body.code, "Kategori kodu") }
                 : {}),
               ...(request.body.name !== undefined
-                ? { name: normalizedName(request.body.name, "Kategori adı", 120) }
+                ? {
+                    name: normalizedName(
+                      request.body.name,
+                      "Kategori adı",
+                      120,
+                    ),
+                  }
                 : {}),
               ...(request.body.isActive !== undefined
                 ? { isActive: request.body.isActive }
@@ -879,7 +911,8 @@ export function registerCatalogRoutes(
           const after = await tx.category.findUniqueOrThrow({
             where: { id: before.id },
           });
-          const statusChanged = request.body.isActive !== undefined &&
+          const statusChanged =
+            request.body.isActive !== undefined &&
             request.body.isActive !== before.isActive;
           await writeAudit(
             tx,
@@ -905,9 +938,7 @@ export function registerCatalogRoutes(
       const q = request.query.q?.trim();
       const isActive = activeFilter(request.query.isActive);
       const where: Prisma.WarehouseWhereInput = {
-        ...(user.role === "ADMIN"
-          ? {}
-          : { id: { in: user.warehouseIds } }),
+        ...(user.role === "ADMIN" ? {} : { id: { in: user.warehouseIds } }),
         ...(isActive === undefined ? {} : { isActive }),
         ...(q
           ? {
@@ -1034,7 +1065,8 @@ export function registerCatalogRoutes(
           const after = await tx.warehouse.findUniqueOrThrow({
             where: { id: before.id },
           });
-          const statusChanged = request.body.isActive !== undefined &&
+          const statusChanged =
+            request.body.isActive !== undefined &&
             request.body.isActive !== before.isActive;
           await writeAudit(
             tx,
@@ -1177,7 +1209,8 @@ export function registerCatalogRoutes(
           const after = await tx.warehouseLocation.findUniqueOrThrow({
             where: { id: before.id },
           });
-          const statusChanged = request.body.isActive !== undefined &&
+          const statusChanged =
+            request.body.isActive !== undefined &&
             request.body.isActive !== before.isActive;
           await writeAudit(
             tx,

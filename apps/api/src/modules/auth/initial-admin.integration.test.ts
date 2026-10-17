@@ -4,10 +4,7 @@ import { randomUUID } from "node:crypto";
 import { after, before, test } from "node:test";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
-import {
-  PrismaClient,
-  type Prisma,
-} from "../../generated/prisma/client.js";
+import { PrismaClient, type Prisma } from "../../generated/prisma/client.js";
 import {
   DEVELOPMENT_DATABASE_NAME,
   TEST_DATABASE_NAME,
@@ -74,14 +71,34 @@ function createAdmin(
   return createInitialAdmin(transaction, input);
 }
 
-test("first admin is created once and concurrent/repeated attempts preserve it", async (context) => {
+test("first admin is created once and concurrent/repeated attempts preserve it", async () => {
   const existingAdmin = await prisma.user.findFirst({
     where: { role: "ADMIN" },
     select: { id: true },
   });
   if (existingAdmin) {
-    context.skip(
-      "Test database already contains an administrator; preserving existing test data.",
+    const before = await prisma.user.findUnique({
+      where: { id: existingAdmin.id },
+    });
+    const attempts = await Promise.allSettled(
+      [1, 2].map((n) =>
+        prisma.$transaction((tx) =>
+          createAdmin(tx, {
+            username: `blocked-admin-${randomUUID()}-${n}`,
+            displayName: "Must not replace existing administrator",
+            passwordHash: "unused-regression-hash",
+          }),
+        ),
+      ),
+    );
+    for (const attempt of attempts) {
+      assert.equal(attempt.status, "rejected");
+      if (attempt.status === "rejected")
+        assert.ok(attempt.reason instanceof InitialAdminAlreadyExistsError);
+    }
+    assert.deepEqual(
+      await prisma.user.findUnique({ where: { id: existingAdmin.id } }),
+      before,
     );
     return;
   }
@@ -110,23 +127,17 @@ test("first admin is created once and concurrent/repeated attempts preserve it",
       ),
     );
     const created = attempts.filter(
-      (
-        result,
-      ): result is PromiseFulfilledResult<{ id: string }> =>
+      (result): result is PromiseFulfilledResult<{ id: string }> =>
         result.status === "fulfilled",
     );
     const createdResult = created[0];
     if (createdResult) {
       createdAdminId = createdResult.value.id;
     }
-    const rejected = attempts.filter(
-      (result) => result.status === "rejected",
-    );
+    const rejected = attempts.filter((result) => result.status === "rejected");
     assert.equal(created.length, 1);
     assert.equal(rejected.length, 1);
-    assert.ok(
-      rejected[0]?.reason instanceof InitialAdminAlreadyExistsError,
-    );
+    assert.ok(rejected[0]?.reason instanceof InitialAdminAlreadyExistsError);
     assert.ok(createdResult);
 
     const createdAdmin = await prisma.user.findUnique({
@@ -168,5 +179,80 @@ test("first admin is created once and concurrent/repeated attempts preserve it",
     if (createdAdminId) {
       await prisma.user.deleteMany({ where: { id: createdAdminId } });
     }
+  }
+});
+
+test("fresh isolated schema creates exactly one initial administrator", async () => {
+  const migrationTarget = parseLocalDatabaseTarget(
+    process.env.TEST_MIGRATION_DATABASE_URL,
+    TEST_DATABASE_NAME,
+  );
+  const ownerPool = new Pool({
+    connectionString: migrationTarget.connectionString,
+    max: 2,
+  });
+  const schema = `initial_admin_${randomUUID().replaceAll("-", "")}`;
+  assert.match(schema, /^initial_admin_[a-f0-9]{32}$/);
+  const isolated = new PrismaClient({
+    adapter: new PrismaPg(pool, { schema }),
+  });
+  try {
+    await ownerPool.query(`CREATE SCHEMA "${schema}"`);
+    await ownerPool.query(
+      `CREATE TYPE "${schema}"."UserRole" AS ENUM ('ADMIN', 'WAREHOUSE_MANAGER', 'VIEWER')`,
+    );
+    await ownerPool.query(
+      `CREATE TABLE "${schema}"."User" (LIKE public."User" INCLUDING ALL)`,
+    );
+    await ownerPool.query(
+      `ALTER TABLE "${schema}"."User" ALTER COLUMN role DROP DEFAULT, ALTER COLUMN role TYPE "${schema}"."UserRole" USING role::text::"${schema}"."UserRole", ALTER COLUMN role SET DEFAULT 'VIEWER'::"${schema}"."UserRole"`,
+    );
+    await ownerPool.query(
+      `GRANT USAGE ON SCHEMA "${schema}" TO stock_warehouse_app`,
+    );
+    await ownerPool.query(
+      `GRANT SELECT, INSERT, UPDATE, DELETE ON "${schema}"."User" TO stock_warehouse_app`,
+    );
+    const input = {
+      username: "isolated-admin",
+      displayName: "Isolated administrator",
+      passwordHash: "test-only-hash",
+    };
+    const results = await Promise.allSettled(
+      [1, 2].map((n) =>
+        isolated.$transaction((tx) =>
+          createInitialAdmin(tx, {
+            ...input,
+            username: `${input.username}-${n}`,
+          }),
+        ),
+      ),
+    );
+    assert.equal(
+      results.filter((r) => r.status === "fulfilled").length,
+      1,
+      results
+        .map((r) => (r.status === "rejected" ? String(r.reason) : "created"))
+        .join("; "),
+    );
+    assert.equal(
+      results.filter(
+        (r) =>
+          r.status === "rejected" &&
+          r.reason instanceof InitialAdminAlreadyExistsError,
+      ).length,
+      1,
+    );
+    const before = await isolated.user.findMany();
+    await assert.rejects(
+      isolated.$transaction((tx) => createInitialAdmin(tx, input)),
+      InitialAdminAlreadyExistsError,
+    );
+    assert.deepEqual(await isolated.user.findMany(), before);
+  } finally {
+    await isolated.$disconnect();
+    // Only this test's random schema in the already-validated dedicated test DB.
+    await ownerPool.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+    await ownerPool.end();
   }
 });

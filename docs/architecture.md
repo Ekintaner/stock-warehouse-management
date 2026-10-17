@@ -1,8 +1,13 @@
-# Mimari taslak
+> **Güncel teslim — 2026-10-17:** Sayım backend ve arayüzü, belge tam terslemesi,
+> tedarikçiler, kullanıcı/depo atamaları, minimum stok, stok/dönem raporları,
+> CSV, denetim ve defter/bakiye kontrolü uygulanmıştır. Aşağıdaki eski aşama
+> notları tarihseldir; güncel kapsam README ve doğrulama raporundadır.
+
+# Mimari
 
 ## 1. İlkeler
 
-Uygulama tek işletme için, yerel bilgisayarda çalışan modüler monolittir. Giriş/oturum, katalog ana kayıtları, giriş/çıkış belgeleri, stok görünümü, hareket geçmişi ve transferler uygulanmıştır; sayım ve raporlar henüz plan kapsamındadır. Frontend React/TypeScript/Vite, API Node.js/TypeScript/Fastify, kalıcı veri PostgreSQL; Prisma veri erişimi ve şema değişiklikleri için kullanılır. Frontend ve backend tek depoda npm workspaces olur. REST API sınırları modüllere göre düzenlenir; ayrı dağıtılan servis, mesaj kuyruğu, Kubernetes veya zorunlu Docker yoktur. Veri modeli Prisma ORM **7.10.0** ile oluşturulmuştur; PostgreSQL bağlantısı için aynı sürümlü `@prisma/client` ve `@prisma/adapter-pg` ile `pg` kullanılır. Prisma 7'nin `prisma-client` generator'ı özel çıktı dizini ve PostgreSQL driver adapter'ı gerektirir.
+Uygulama tek işletme için, yerel bilgisayarda çalışan modüler monolittir. Giriş/oturum, katalog ana kayıtları, giriş/çıkış belgeleri, stok görünümü, hareket geçmişi ve transferler uygulanmıştır; sayım, tedarikçi/kullanıcı yönetimi, raporlar ve belge tersleme de uygulanmıştır. Frontend React/TypeScript/Vite, API Node.js/TypeScript/Fastify, kalıcı veri PostgreSQL; Prisma veri erişimi ve şema değişiklikleri için kullanılır. Frontend ve backend tek depoda npm workspaces olur. REST API sınırları modüllere göre düzenlenir; ayrı dağıtılan servis, mesaj kuyruğu, Kubernetes veya zorunlu Docker yoktur. Veri modeli Prisma ORM **7.10.1** ile oluşturulmuştur; PostgreSQL bağlantısı için aynı sürümlü `@prisma/client` ve `@prisma/adapter-pg` ile `pg` kullanılır. Prisma 7'nin `prisma-client` generator'ı özel çıktı dizini ve PostgreSQL driver adapter'ı gerektirir.
 
 Prisma paketi Node.js 24 ve TypeScript 6.0.3 ile uyumlu kararlı sürüm olarak npm kaydından doğrulanmıştır. Bağımlılık sürümleri kök npm kilit dosyasında sabitlenmiştir.
 
@@ -169,3 +174,25 @@ Yanıtlar sabit, makinece okunabilir hata kodu ve kullanıcıya uygun Türkçe m
 ## 9. Raporlama ve demo verisi
 
 Raporlar erişim kapsamını backend sorgusunda uygular; sayfalama ve filtre parametreleri doğrulanır. CSV çıktısı da aynı veri erişim sınırına uyar. Demo seed verisi sentetiktir, gerçek kişi/işletme verisi içermez ve arayüzde demo olduğu açıkça belirtilir. Üretilmiş başarı oranı veya gerçekmiş gibi sunulan kullanıcı/işlem sayacı kullanılmaz.
+
+
+## Tamamlama mimarisi — 2026-10-17
+
+`modules/operations` tedarikçi ve kullanıcı yönetimi, minimum stok eşikleri,
+raporlar, CSV, denetim görünümü, tam belge terslemesi ve salt okunur uzlaştırmayı
+barındırır. Bütün API okumaları ortak oturum hook’undan geçer. Yönetici dışındaki
+rapor istekleri depo atamasıyla daraltılır. Parolalar audit’e girmez; kullanıcı
+parola/rol/atama değişiminde oturumlar iptal edilir. Son aktif yönetici kontrolü
+transaction advisory lock ile sıralanır.
+
+Sayım ekranı her sayfada değişen satırları açıkça kaydeder. Kirli giriş varken
+filtre ve sayfa değiştirme kapalıdır; bağlantıyla ayrılmada onay istenir.
+Onay/iptal ve tersleme ağ tekrarında aynı idempotency anahtarını kullanır.
+Ürün düzenlemesinde Product FOR UPDATE; sayım snapshot’ında sıralı Product
+FOR SHARE kullanılarak ürün birimi değişikliğiyle yarış önlenir.
+
+Stok raporu ürün/depo bakiyelerini minimum stok ayarıyla birleştirir; depo
+özeti yalnız pozitif bakiyeyi depo ve birime göre toplar. Dönem özeti hareketleri
+yön ve tür bazında ayırır. Farklı birimler toplanmaz. CSV hücreleri quote edilir,
+formül başlangıçları güvenli metne çevrilir. Uzlaştırma tek sorguda defter
+miktarını bakiyeyle karşılaştırır ve herhangi bir düzeltme yazmaz.

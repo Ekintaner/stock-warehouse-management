@@ -1,11 +1,6 @@
 import "dotenv/config";
 import assert from "node:assert/strict";
-import {
-  createHash,
-  createHmac,
-  randomBytes,
-  randomUUID,
-} from "node:crypto";
+import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import { after, before, test } from "node:test";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
@@ -19,9 +14,7 @@ import {
   parseLocalDatabaseTarget,
 } from "../../database/local-database-target.js";
 import { ApiError } from "../../shared/api-error.js";
-import {
-  ensureWarehouseCanBeDeactivated,
-} from "./catalog-routes.js";
+import { ensureWarehouseCanBeDeactivated } from "./catalog-routes.js";
 
 const testTarget = parseLocalDatabaseTarget(
   process.env.TEST_DATABASE_URL,
@@ -59,98 +52,8 @@ const cleanupPool = new Pool({
 const cleanupPrisma = new PrismaClient({ adapter: new PrismaPg(cleanupPool) });
 
 async function cleanCatalogFixtures(): Promise<void> {
-  const fixtureUsers = await cleanupPrisma.user.findMany({
-    where: { username: { startsWith: "catalog-" } },
-    select: { id: true },
-  });
-  const fixtureCategories = await cleanupPrisma.category.findMany({
-    where: {
-      code: { startsWith: "CAT-" },
-      OR: [
-        { name: { startsWith: "Catalog Integration Category " } },
-        { name: "Catalog Test" },
-        { code: { startsWith: "TOOLS-" }, name: "El Aletleri" },
-      ],
-    },
-    select: { id: true },
-  });
-  const fixtureWarehouses = await cleanupPrisma.warehouse.findMany({
-    where: {
-      OR: [
-        {
-          code: { startsWith: "WH-" },
-          OR: [
-            { name: { startsWith: "Catalog Integration Warehouse " } },
-            { name: { startsWith: "Test Warehouse " } },
-          ],
-        },
-        { code: { startsWith: "LOCK-" }, name: "Rollback stock lock test" },
-      ],
-    },
-    select: { id: true },
-  });
-  const fixtureProducts = await cleanupPrisma.product.findMany({
-    where: {
-      categoryId: { in: fixtureCategories.map(({ id }) => id) },
-    },
-    select: { id: true },
-  });
-  const userIds = fixtureUsers.map(({ id }) => id);
-  const categoryIds = fixtureCategories.map(({ id }) => id);
-  const warehouseIds = fixtureWarehouses.map(({ id }) => id);
-  const productIds = fixtureProducts.map(({ id }) => id);
-  await cleanupPrisma.auditEvent.deleteMany({
-    where: {
-      OR: [
-        { userId: { in: userIds } },
-        { relatedId: { in: [...categoryIds, ...warehouseIds, ...productIds] } },
-      ],
-    },
-  });
-  await cleanupPrisma.stockDocument.deleteMany({
-    where: { createdById: { in: userIds } },
-  });
-  await cleanupPrisma.transfer.deleteMany({
-    where: { createdById: { in: userIds }, status: "DRAFT" },
-  });
-  await cleanupPrisma.warehouseLocation.deleteMany({
-    where: { warehouseId: { in: warehouseIds } },
-  });
-  await cleanupPrisma.stockCountLine.deleteMany({
-    where: { productId: { in: productIds } },
-  });
-  await cleanupPrisma.stockCount.deleteMany({
-    where: {
-      OR: [
-        { warehouseId: { in: warehouseIds } },
-        { openedById: { in: userIds } },
-      ],
-    },
-  });
-  await cleanupPrisma.product.deleteMany({
-    where: { id: { in: productIds } },
-  });
-  await cleanupPrisma.category.deleteMany({
-    where: { id: { in: categoryIds } },
-  });
-  await cleanupPrisma.warehouse.deleteMany({
-    where: {
-      id: { in: warehouseIds },
-      sourceTransfers: { none: {} },
-      targetTransfers: { none: {} },
-      stockCounts: { none: {} },
-    },
-  });
-  await cleanupPrisma.user.deleteMany({
-    where: {
-      id: { in: userIds },
-      createdTransfers: { none: {} },
-      openedCounts: { none: {} },
-      responsibleCounts: { none: {} },
-      approvedCounts: { none: {} },
-      cancelledCounts: { none: {} },
-    },
-  });
+  // Unique fixtures are retained: completed counts and the stock ledger are immutable.
+  // Never remove historical fixtures by broad prefixes shared with other test runs.
 }
 
 async function dropAuditFailureTrigger(): Promise<void> {
@@ -210,7 +113,10 @@ class MemoryAuthStore implements AuthStore {
     );
   }
 
-  async updatePasswordHash(userId: string, passwordHash: string): Promise<void> {
+  async updatePasswordHash(
+    userId: string,
+    passwordHash: string,
+  ): Promise<void> {
     const identity = this.identities.get(userId);
     if (identity) {
       identity.user.passwordHash = passwordHash;
@@ -332,7 +238,12 @@ test("catalog API enforces authorization, integrity, audit, and concurrency rule
         username: `catalog-${suffix}-${role}`.toLowerCase(),
         displayName: "Catalog Test",
         passwordHash: "not-used-by-catalog-tests",
-        role: role === "admin" ? "ADMIN" : role === "manager" ? "WAREHOUSE_MANAGER" : "VIEWER",
+        role:
+          role === "admin"
+            ? "ADMIN"
+            : role === "manager"
+              ? "WAREHOUSE_MANAGER"
+              : "VIEWER",
       },
     });
   }
@@ -347,9 +258,7 @@ test("catalog API enforces authorization, integrity, audit, and concurrency rule
   }
 
   const store = new MemoryAuthStore();
-  const adminIdentity = store.addIdentity(
-    identity(userIds.admin, "ADMIN", []),
-  );
+  const adminIdentity = store.addIdentity(identity(userIds.admin, "ADMIN", []));
   const managerIdentity = store.addIdentity(
     identity(userIds.manager, "WAREHOUSE_MANAGER", [warehouseIds[0]]),
   );
@@ -365,19 +274,22 @@ test("catalog API enforces authorization, integrity, audit, and concurrency rule
   );
 
   try {
-    const categoryResponse = await inject(app, "POST", "/api/categories", admin, {
-      code: `  cat-${suffix}  `,
-      name: `Catalog Integration Category ${suffix}`,
-    });
+    const categoryResponse = await inject(
+      app,
+      "POST",
+      "/api/categories",
+      admin,
+      {
+        code: `  cat-${suffix}  `,
+        name: `Catalog Integration Category ${suffix}`,
+      },
+    );
     assert.equal(categoryResponse.statusCode, 201);
     const category = categoryResponse.json();
     categoryId = category.id;
     assert.equal(category.code, `CAT-${suffix}`);
 
-    const createProduct = async (
-      sku: string,
-      barcode?: string,
-    ) =>
+    const createProduct = async (sku: string, barcode?: string) =>
       inject(app, "POST", "/api/products", admin, {
         sku,
         name: "Test Ürünü",
@@ -386,11 +298,14 @@ test("catalog API enforces authorization, integrity, audit, and concurrency rule
         ...(barcode === undefined ? {} : { barcode }),
       });
 
-    const productResponse = await createProduct("  ab-001  ", "000012345");
+    const productResponse = await createProduct(
+      `  ab-${suffix}  `,
+      `000012345${suffix}`,
+    );
     assert.equal(productResponse.statusCode, 201);
     const product = productResponse.json();
-    assert.equal(product.sku, "AB-001");
-    assert.equal(product.barcode, "000012345");
+    assert.equal(product.sku, `AB-${suffix}`);
+    assert.equal(product.barcode, `000012345${suffix}`);
 
     const emptyBarcodeResponse = await createProduct(`NULL-${suffix}`, "   ");
     assert.equal(emptyBarcodeResponse.statusCode, 201);
@@ -410,18 +325,21 @@ test("catalog API enforces authorization, integrity, audit, and concurrency rule
         assert.ok(response.json().id);
       }
     }
-    const duplicateBarcode = await createProduct(`OTHER-${suffix}`, "000012345");
+    const duplicateBarcode = await createProduct(
+      `OTHER-${suffix}`,
+      `000012345${suffix}`,
+    );
     assert.equal(duplicateBarcode.statusCode, 409);
 
     const list = await inject(
       app,
       "GET",
-      `/api/products?q=ab-001&isActive=true&page=1&pageSize=1&sort=sku`,
+      `/api/products?q=ab-${suffix}&isActive=true&page=1&pageSize=1&sort=sku`,
       manager,
     );
     assert.equal(list.statusCode, 200);
     assert.equal(list.json().total, 1);
-    assert.equal(list.json().items[0].sku, "AB-001");
+    assert.equal(list.json().items[0].sku, `AB-${suffix}`);
 
     const missingCsrf = await inject(
       app,
@@ -592,9 +510,7 @@ test("catalog API enforces authorization, integrity, audit, and concurrency rule
     );
     assert.equal(hiddenWarehouseList.statusCode, 200);
     assert.deepEqual(
-      hiddenWarehouseList.json().items.map(
-        (item: { id: string }) => item.id,
-      ),
+      hiddenWarehouseList.json().items.map((item: { id: string }) => item.id),
       [warehouseIds[0]],
     );
     const locationAcrossWarehouses = await inject(
@@ -772,7 +688,10 @@ test("catalog API enforces authorization, integrity, audit, and concurrency rule
 });
 
 before(async () => {
-  const result = await pool.query<{ databaseName: string; currentUser: string }>(
+  const result = await pool.query<{
+    databaseName: string;
+    currentUser: string;
+  }>(
     `SELECT current_database() AS "databaseName", current_user AS "currentUser"`,
   );
   assert.equal(result.rows[0]?.databaseName, TEST_DATABASE_NAME);
@@ -784,7 +703,10 @@ before(async () => {
     `SELECT current_database() AS "databaseName", current_user AS "currentUser"`,
   );
   assert.equal(cleanupIdentity.rows[0]?.databaseName, TEST_DATABASE_NAME);
-  assert.equal(cleanupIdentity.rows[0]?.currentUser, "stock_warehouse_migrator");
+  assert.equal(
+    cleanupIdentity.rows[0]?.currentUser,
+    "stock_warehouse_migrator",
+  );
   await cleanCatalogFixtures();
 });
 

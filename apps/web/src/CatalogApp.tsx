@@ -6,6 +6,8 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
+import CountWorkspace from "./CountWorkspace.js";
+import OperationsWorkspace from "./OperationsWorkspace.js";
 import StockWorkspace from "./StockWorkspace.js";
 import TransferWorkspace from "./TransferWorkspace.js";
 
@@ -163,6 +165,13 @@ function CatalogApp({ session, onLogout, loggingOut }: Props) {
     ) {
       return "stock";
     }
+    if (path.startsWith("/counts")) return "counts";
+    if (
+      ["/suppliers", "/reports", "/users", "/audit"].some((prefix) =>
+        path.startsWith(prefix),
+      )
+    )
+      return "operations";
     if (path.startsWith("/categories")) {
       return "categories";
     }
@@ -175,7 +184,11 @@ function CatalogApp({ session, onLogout, loggingOut }: Props) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <a className="brand" href="/products" onClick={(event) => navigate(event, "/products")}>
+        <a
+          className="brand"
+          href="/products"
+          onClick={(event) => navigate(event, "/products")}
+        >
           Stok ve Depo
         </a>
         <nav aria-label="Ana gezinme" className="main-navigation">
@@ -204,45 +217,105 @@ function CatalogApp({ session, onLogout, loggingOut }: Props) {
             Depolar
           </a>
           <a
-            className={page === "stock" && path === "/stock" ? "nav-link selected" : "nav-link"}
+            className={
+              page === "stock" && path === "/stock"
+                ? "nav-link selected"
+                : "nav-link"
+            }
             href="/stock"
-            aria-current={page === "stock" && path === "/stock" ? "page" : undefined}
+            aria-current={
+              page === "stock" && path === "/stock" ? "page" : undefined
+            }
             onClick={(event) => navigate(event, "/stock")}
           >
             Stok
           </a>
           <a
-            className={page === "stock" && path.startsWith("/stock/receipts") ? "nav-link selected" : "nav-link"}
+            className={
+              page === "stock" && path.startsWith("/stock/receipts")
+                ? "nav-link selected"
+                : "nav-link"
+            }
             href="/stock/receipts"
-            aria-current={page === "stock" && path.startsWith("/stock/receipts") ? "page" : undefined}
+            aria-current={
+              page === "stock" && path.startsWith("/stock/receipts")
+                ? "page"
+                : undefined
+            }
             onClick={(event) => navigate(event, "/stock/receipts")}
           >
             Stok Girişleri
           </a>
           <a
-            className={page === "stock" && path.startsWith("/stock/issues") ? "nav-link selected" : "nav-link"}
+            className={
+              page === "stock" && path.startsWith("/stock/issues")
+                ? "nav-link selected"
+                : "nav-link"
+            }
             href="/stock/issues"
-            aria-current={page === "stock" && path.startsWith("/stock/issues") ? "page" : undefined}
+            aria-current={
+              page === "stock" && path.startsWith("/stock/issues")
+                ? "page"
+                : undefined
+            }
             onClick={(event) => navigate(event, "/stock/issues")}
           >
             Stok Çıkışları
           </a>
           <a
-            className={page === "stock" && path.startsWith("/movements") ? "nav-link selected" : "nav-link"}
+            className={
+              page === "stock" && path.startsWith("/movements")
+                ? "nav-link selected"
+                : "nav-link"
+            }
             href="/movements"
-            aria-current={page === "stock" && path.startsWith("/movements") ? "page" : undefined}
+            aria-current={
+              page === "stock" && path.startsWith("/movements")
+                ? "page"
+                : undefined
+            }
             onClick={(event) => navigate(event, "/movements")}
           >
             Hareketler
           </a>
           <a
-            className={page === "stock" && path.startsWith("/transfers") ? "nav-link selected" : "nav-link"}
+            className={
+              page === "stock" && path.startsWith("/transfers")
+                ? "nav-link selected"
+                : "nav-link"
+            }
             href="/transfers"
-            aria-current={page === "stock" && path.startsWith("/transfers") ? "page" : undefined}
+            aria-current={
+              page === "stock" && path.startsWith("/transfers")
+                ? "page"
+                : undefined
+            }
             onClick={(event) => navigate(event, "/transfers")}
           >
             Transferler
           </a>
+          {[
+            ["/counts", "Sayımlar"],
+            ["/suppliers", "Tedarikçiler"],
+            ["/reports", "Raporlar"],
+            ...(canManage
+              ? [
+                  ["/users", "Kullanıcılar"],
+                  ["/audit", "Denetim kayıtları"],
+                ]
+              : []),
+          ].map(([href, label]) => (
+            <a
+              key={href}
+              className={
+                path.startsWith(href!) ? "nav-link selected" : "nav-link"
+              }
+              href={href}
+              onClick={(e) => navigate(e, href!)}
+            >
+              {label}
+            </a>
+          ))}
         </nav>
       </aside>
       <div className="workspace">
@@ -261,7 +334,29 @@ function CatalogApp({ session, onLogout, loggingOut }: Props) {
           </button>
         </header>
         <main className="content" id="main-content">
-          {banner && <p className="success-banner" role="status">{banner}</p>}
+          {banner && (
+            <p className="success-banner" role="status">
+              {banner}
+            </p>
+          )}
+          {page === "counts" && (
+            <CountWorkspace
+              key={path}
+              path={path}
+              role={session.user.role}
+              userId={session.user.id}
+              csrfToken={session.csrfToken}
+            />
+          )}
+          {page === "operations" && (
+            <OperationsWorkspace
+              key={path}
+              path={path}
+              role={session.user.role}
+              userId={session.user.id}
+              csrfToken={session.csrfToken}
+            />
+          )}
           {page === "products" && (
             <ProductsPage
               path={path}
@@ -289,8 +384,8 @@ function CatalogApp({ session, onLogout, loggingOut }: Props) {
               onSuccess={setBanner}
             />
           )}
-          {page === "stock" && (
-            path.startsWith("/transfers") ? (
+          {page === "stock" &&
+            (path.startsWith("/transfers") ? (
               <TransferWorkspace
                 path={path}
                 role={session.user.role}
@@ -307,8 +402,7 @@ function CatalogApp({ session, onLogout, loggingOut }: Props) {
                 navigate={navigate}
                 onSuccess={setBanner}
               />
-            )
-          )}
+            ))}
         </main>
       </div>
     </div>
@@ -352,13 +446,11 @@ async function allCategories(csrfToken: string): Promise<Category[]> {
     csrfToken,
   );
   const remaining = await Promise.all(
-    Array.from(
-      { length: Math.ceil(first.total / pageSize) - 1 },
-      (_, index) =>
-        api<Page<Category>>(
-          `/api/categories?page=${index + 2}&pageSize=${pageSize}&sort=name&direction=asc`,
-          csrfToken,
-        ),
+    Array.from({ length: Math.ceil(first.total / pageSize) - 1 }, (_, index) =>
+      api<Page<Category>>(
+        `/api/categories?page=${index + 2}&pageSize=${pageSize}&sort=name&direction=asc`,
+        csrfToken,
+      ),
     ),
   );
   return [first, ...remaining].flatMap((page) => page.items);
@@ -407,11 +499,19 @@ function PageHeader({
 }
 
 function Loading() {
-  return <p className="state-message" role="status">Yükleniyor…</p>;
+  return (
+    <p className="state-message" role="status">
+      Yükleniyor…
+    </p>
+  );
 }
 
 function LoadError({ message }: { message: string }) {
-  return <p className="error-banner" role="alert">{message}</p>;
+  return (
+    <p className="error-banner" role="alert">
+      {message}
+    </p>
+  );
 }
 
 function Empty({ children }: { children: ReactNode }) {
@@ -432,7 +532,9 @@ function Pagination({
   const pages = pageCount(total, pageSize);
   return (
     <div className="pagination" aria-label="Sayfalama">
-      <span>{total} kayıt · Sayfa {page} / {pages}</span>
+      <span>
+        {total} kayıt · Sayfa {page} / {pages}
+      </span>
       <div>
         <button
           className="secondary-button"
@@ -519,7 +621,10 @@ function ProductsList(props: PageProps) {
         setCategories(categoryList);
       })
       .catch((cause: unknown) => {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : "Ürünler yüklenemedi.");
+        if (!cancelled)
+          setError(
+            cause instanceof Error ? cause.message : "Ürünler yüklenemedi.",
+          );
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -539,11 +644,17 @@ function ProductsList(props: PageProps) {
       <PageHeader
         title="Ürünler"
         subtitle="Ürün kataloğu"
-        action={canManage ? (
-          <Anchor className="primary-button link-button" href="/products/new" navigate={navigate}>
-            Ürün ekle
-          </Anchor>
-        ) : undefined}
+        action={
+          canManage ? (
+            <Anchor
+              className="primary-button link-button"
+              href="/products/new"
+              navigate={navigate}
+            >
+              Ürün ekle
+            </Anchor>
+          ) : undefined
+        }
       />
       <section className="filter-bar" aria-label="Ürün filtreleri">
         <label>
@@ -559,12 +670,15 @@ function ProductsList(props: PageProps) {
           Kategori
           <select
             value={categoryId}
-            onChange={(event) => changeFilter(() => setCategoryId(event.target.value))}
+            onChange={(event) =>
+              changeFilter(() => setCategoryId(event.target.value))
+            }
           >
             <option value="">Tüm kategoriler</option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
-                {category.name}{category.isActive ? "" : " (Pasif)"}
+                {category.name}
+                {category.isActive ? "" : " (Pasif)"}
               </option>
             ))}
           </select>
@@ -573,7 +687,9 @@ function ProductsList(props: PageProps) {
           Durum
           <select
             value={isActive}
-            onChange={(event) => changeFilter(() => setIsActive(event.target.value))}
+            onChange={(event) =>
+              changeFilter(() => setIsActive(event.target.value))
+            }
           >
             <option value="">Tümü</option>
             <option value="true">Aktif</option>
@@ -582,7 +698,12 @@ function ProductsList(props: PageProps) {
         </label>
         <label>
           Sırala
-          <select value={sort} onChange={(event) => changeFilter(() => setSort(event.target.value))}>
+          <select
+            value={sort}
+            onChange={(event) =>
+              changeFilter(() => setSort(event.target.value))
+            }
+          >
             <option value="sku">SKU</option>
             <option value="name">Ürün adı</option>
             <option value="category">Kategori</option>
@@ -595,7 +716,9 @@ function ProductsList(props: PageProps) {
           Yön
           <select
             value={direction}
-            onChange={(event) => changeFilter(() => setDirection(event.target.value))}
+            onChange={(event) =>
+              changeFilter(() => setDirection(event.target.value))
+            }
           >
             <option value="asc">Artan</option>
             <option value="desc">Azalan</option>
@@ -603,7 +726,9 @@ function ProductsList(props: PageProps) {
         </label>
       </section>
       {error && <LoadError message={error} />}
-      {loading ? <Loading /> : data?.items.length ? (
+      {loading ? (
+        <Loading />
+      ) : data?.items.length ? (
         <>
           <div className="table-wrap">
             <table>
@@ -620,12 +745,27 @@ function ProductsList(props: PageProps) {
               <tbody>
                 {data.items.map((product) => (
                   <tr key={product.id}>
-                    <td><Anchor href={`/products/${product.id}`} navigate={navigate}>{product.sku}</Anchor></td>
+                    <td>
+                      <Anchor
+                        href={`/products/${product.id}`}
+                        navigate={navigate}
+                      >
+                        {product.sku}
+                      </Anchor>
+                    </td>
                     <td>{product.name}</td>
                     <td>{product.category.name}</td>
                     <td>{unitLabel(product.unit)}</td>
                     <td>{product.barcode ?? "—"}</td>
-                    <td><span className={product.isActive ? "status active" : "status inactive"}>{statusLabel(product.isActive)}</span></td>
+                    <td>
+                      <span
+                        className={
+                          product.isActive ? "status active" : "status inactive"
+                        }
+                      >
+                        {statusLabel(product.isActive)}
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -638,8 +778,14 @@ function ProductsList(props: PageProps) {
             onPage={setPage}
           />
         </>
-      ) : !error ? <Empty>Bu filtrelerle eşleşen ürün bulunamadı.</Empty> : null}
-      <button className="quiet-button reload-button" type="button" onClick={() => setReload((value) => value + 1)}>
+      ) : !error ? (
+        <Empty>Bu filtrelerle eşleşen ürün bulunamadı.</Empty>
+      ) : null}
+      <button
+        className="quiet-button reload-button"
+        type="button"
+        onClick={() => setReload((value) => value + 1)}
+      >
         Listeyi yenile
       </button>
     </>
@@ -676,14 +822,20 @@ function ProductForm({
         if (!cancelled) setCategories(items);
       })
       .catch((cause: unknown) => {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : "Kategoriler yüklenemedi.");
+        if (!cancelled)
+          setError(
+            cause instanceof Error ? cause.message : "Kategoriler yüklenemedi.",
+          );
       });
     return () => {
       cancelled = true;
     };
   }, [csrfToken]);
 
-  function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
+  function update<K extends keyof typeof form>(
+    key: K,
+    value: (typeof form)[K],
+  ) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
@@ -720,30 +872,107 @@ function ProductForm({
   return (
     <section>
       <PageHeader title={product ? "Ürünü düzenle" : "Yeni ürün"} />
-      <Anchor className="back-link" href={product ? `/products/${product.id}` : "/products"} navigate={navigate}>
+      <Anchor
+        className="back-link"
+        href={product ? `/products/${product.id}` : "/products"}
+        navigate={navigate}
+      >
         ← Ürünlere dön
       </Anchor>
       <form className="data-form" onSubmit={(event) => void submit(event)}>
-        <label>SKU<input required maxLength={64} value={form.sku} onChange={(event) => update("sku", event.target.value)} autoComplete="off" /></label>
-        <label>Ürün adı<input required maxLength={180} value={form.name} onChange={(event) => update("name", event.target.value)} /></label>
-        <label>Barkod<input maxLength={64} value={form.barcode} onChange={(event) => update("barcode", event.target.value)} inputMode="text" /></label>
-        <label>Açıklama<textarea maxLength={1000} rows={4} value={form.description} onChange={(event) => update("description", event.target.value)} /></label>
-        <label>Kategori<select required value={form.categoryId} onChange={(event) => update("categoryId", event.target.value)}>
-          <option value="">Kategori seçin</option>
-          {categories.filter((category) => category.isActive || category.id === form.categoryId).map((category) => (
-            <option key={category.id} value={category.id}>{category.name}{category.isActive ? "" : " (Pasif)"}</option>
-          ))}
-        </select></label>
-        <label>Birim<select value={form.unit} onChange={(event) => update("unit", event.target.value as typeof form.unit)}>
-          <option value="EACH">Adet</option>
-          <option value="KILOGRAM">Kilogram</option>
-          <option value="METER">Metre</option>
-        </select></label>
-        {product && <label className="checkbox-label"><input type="checkbox" checked={form.isActive} onChange={(event) => update("isActive", event.target.checked)} /> Aktif</label>}
+        <label>
+          SKU
+          <input
+            required
+            maxLength={64}
+            value={form.sku}
+            onChange={(event) => update("sku", event.target.value)}
+            autoComplete="off"
+          />
+        </label>
+        <label>
+          Ürün adı
+          <input
+            required
+            maxLength={180}
+            value={form.name}
+            onChange={(event) => update("name", event.target.value)}
+          />
+        </label>
+        <label>
+          Barkod
+          <input
+            maxLength={64}
+            value={form.barcode}
+            onChange={(event) => update("barcode", event.target.value)}
+            inputMode="text"
+          />
+        </label>
+        <label>
+          Açıklama
+          <textarea
+            maxLength={1000}
+            rows={4}
+            value={form.description}
+            onChange={(event) => update("description", event.target.value)}
+          />
+        </label>
+        <label>
+          Kategori
+          <select
+            required
+            value={form.categoryId}
+            onChange={(event) => update("categoryId", event.target.value)}
+          >
+            <option value="">Kategori seçin</option>
+            {categories
+              .filter(
+                (category) =>
+                  category.isActive || category.id === form.categoryId,
+              )
+              .map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                  {category.isActive ? "" : " (Pasif)"}
+                </option>
+              ))}
+          </select>
+        </label>
+        <label>
+          Birim
+          <select
+            value={form.unit}
+            onChange={(event) =>
+              update("unit", event.target.value as typeof form.unit)
+            }
+          >
+            <option value="EACH">Adet</option>
+            <option value="KILOGRAM">Kilogram</option>
+            <option value="METER">Metre</option>
+          </select>
+        </label>
+        {product && (
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={form.isActive}
+              onChange={(event) => update("isActive", event.target.checked)}
+            />{" "}
+            Aktif
+          </label>
+        )}
         {error && <LoadError message={error} />}
         <div className="form-actions">
-          <button className="primary-button" type="submit" disabled={saving}>{saving ? "Kaydediliyor…" : "Kaydet"}</button>
-          <Anchor className="secondary-button link-button" href={product ? `/products/${product.id}` : "/products"} navigate={navigate}>Vazgeç</Anchor>
+          <button className="primary-button" type="submit" disabled={saving}>
+            {saving ? "Kaydediliyor…" : "Kaydet"}
+          </button>
+          <Anchor
+            className="secondary-button link-button"
+            href={product ? `/products/${product.id}` : "/products"}
+            navigate={navigate}
+          >
+            Vazgeç
+          </Anchor>
         </div>
       </form>
     </section>
@@ -776,7 +1005,10 @@ function ProductDetail({
         if (!cancelled) setProduct(data);
       })
       .catch((cause: unknown) => {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : "Ürün yüklenemedi.");
+        if (!cancelled)
+          setError(
+            cause instanceof Error ? cause.message : "Ürün yüklenemedi.",
+          );
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -789,16 +1021,31 @@ function ProductDetail({
   if (error) return <LoadError message={error} />;
   if (!product) return <Empty>Ürün bulunamadı.</Empty>;
   if (editing) {
-    return <ProductForm product={product} navigate={navigate} csrfToken={csrfToken} onSuccess={onSuccess} />;
+    return (
+      <ProductForm
+        product={product}
+        navigate={navigate}
+        csrfToken={csrfToken}
+        onSuccess={onSuccess}
+      />
+    );
   }
   return (
     <section>
       <PageHeader
         title={product.name}
         subtitle={product.sku}
-        action={canManage ? (
-          <Anchor className="primary-button link-button" href={`/products/${id}/edit`} navigate={navigate}>Düzenle</Anchor>
-        ) : undefined}
+        action={
+          canManage ? (
+            <Anchor
+              className="primary-button link-button"
+              href={`/products/${id}/edit`}
+              navigate={navigate}
+            >
+              Düzenle
+            </Anchor>
+          ) : undefined
+        }
       />
       <dl className="details-grid">
         <Detail label="Kategori" value={product.category.name} />
@@ -807,7 +1054,9 @@ function ProductDetail({
         <Detail label="Durum" value={statusLabel(product.isActive)} />
         <Detail label="Açıklama" value={product.description ?? "—"} />
       </dl>
-      <Anchor className="back-link" href="/products" navigate={navigate}>← Ürün listesine dön</Anchor>
+      <Anchor className="back-link" href="/products" navigate={navigate}>
+        ← Ürün listesine dön
+      </Anchor>
     </section>
   );
 }
@@ -816,7 +1065,14 @@ function CategoriesPage(props: PageProps) {
   const { path, navigate, canManage, csrfToken, onSuccess } = props;
   const match = path.match(/^\/categories\/([^/]+)(?:\/(edit))?$/);
   if (path === "/categories/new") {
-    return <NamedForm kind="category" navigate={navigate} csrfToken={csrfToken} onSuccess={onSuccess} />;
+    return (
+      <NamedForm
+        kind="category"
+        navigate={navigate}
+        csrfToken={csrfToken}
+        onSuccess={onSuccess}
+      />
+    );
   }
   if (match?.[1] && match[1] !== "new") {
     return (
@@ -837,13 +1093,29 @@ function CategoriesPage(props: PageProps) {
 function WarehousesPage(props: PageProps) {
   const { path, navigate, canManage, csrfToken, onSuccess } = props;
   if (path === "/warehouses/new") {
-    return <NamedForm kind="warehouse" navigate={navigate} csrfToken={csrfToken} onSuccess={onSuccess} />;
+    return (
+      <NamedForm
+        kind="warehouse"
+        navigate={navigate}
+        csrfToken={csrfToken}
+        onSuccess={onSuccess}
+      />
+    );
   }
   const locationNew = path.match(/^\/warehouses\/([^/]+)\/locations\/new$/);
   if (locationNew?.[1]) {
-    return <LocationForm warehouseId={locationNew[1]} navigate={navigate} csrfToken={csrfToken} onSuccess={onSuccess} />;
+    return (
+      <LocationForm
+        warehouseId={locationNew[1]}
+        navigate={navigate}
+        csrfToken={csrfToken}
+        onSuccess={onSuccess}
+      />
+    );
   }
-  const locationRoute = path.match(/^\/warehouses\/([^/]+)\/locations\/([^/]+)(?:\/(edit))?$/);
+  const locationRoute = path.match(
+    /^\/warehouses\/([^/]+)\/locations\/([^/]+)(?:\/(edit))?$/,
+  );
   if (locationRoute?.[1] && locationRoute[2]) {
     return (
       <LocationDetail
@@ -905,7 +1177,10 @@ function NamedList(props: PageProps & { kind: NamedKind }) {
         if (!cancelled) setData(result);
       })
       .catch((cause: unknown) => {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : `${title} yüklenemedi.`);
+        if (!cancelled)
+          setError(
+            cause instanceof Error ? cause.message : `${title} yüklenemedi.`,
+          );
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -918,45 +1193,126 @@ function NamedList(props: PageProps & { kind: NamedKind }) {
     setPage(1);
     action();
   }
-  const createHref = kind === "category" ? "/categories/new" : "/warehouses/new";
+  const createHref =
+    kind === "category" ? "/categories/new" : "/warehouses/new";
   const baseHref = kind === "category" ? "/categories" : "/warehouses";
   return (
     <>
       <PageHeader
         title={title}
-        action={canManage ? <Anchor className="primary-button link-button" href={createHref} navigate={navigate}>{kind === "category" ? "Kategori ekle" : "Depo ekle"}</Anchor> : undefined}
+        action={
+          canManage ? (
+            <Anchor
+              className="primary-button link-button"
+              href={createHref}
+              navigate={navigate}
+            >
+              {kind === "category" ? "Kategori ekle" : "Depo ekle"}
+            </Anchor>
+          ) : undefined
+        }
       />
       <section className="filter-bar">
-        <label>Ara<input value={q} maxLength={120} onChange={(event) => change(() => setQ(event.target.value))} placeholder="Kod veya ad" /></label>
-        <label>Durum<select value={isActive} onChange={(event) => change(() => setIsActive(event.target.value))}>
-          <option value="">Tümü</option><option value="true">Aktif</option><option value="false">Pasif</option>
-        </select></label>
-        <label>Sırala<select value={sort} onChange={(event) => change(() => setSort(event.target.value))}>
-          <option value="code">Kod</option><option value="name">Ad</option><option value="isActive">Durum</option>
-        </select></label>
-        <label>Yön<select value={direction} onChange={(event) => change(() => setDirection(event.target.value))}>
-          <option value="asc">Artan</option><option value="desc">Azalan</option>
-        </select></label>
+        <label>
+          Ara
+          <input
+            value={q}
+            maxLength={120}
+            onChange={(event) => change(() => setQ(event.target.value))}
+            placeholder="Kod veya ad"
+          />
+        </label>
+        <label>
+          Durum
+          <select
+            value={isActive}
+            onChange={(event) => change(() => setIsActive(event.target.value))}
+          >
+            <option value="">Tümü</option>
+            <option value="true">Aktif</option>
+            <option value="false">Pasif</option>
+          </select>
+        </label>
+        <label>
+          Sırala
+          <select
+            value={sort}
+            onChange={(event) => change(() => setSort(event.target.value))}
+          >
+            <option value="code">Kod</option>
+            <option value="name">Ad</option>
+            <option value="isActive">Durum</option>
+          </select>
+        </label>
+        <label>
+          Yön
+          <select
+            value={direction}
+            onChange={(event) => change(() => setDirection(event.target.value))}
+          >
+            <option value="asc">Artan</option>
+            <option value="desc">Azalan</option>
+          </select>
+        </label>
       </section>
       {error && <LoadError message={error} />}
-      {loading ? <Loading /> : data?.items.length ? (
+      {loading ? (
+        <Loading />
+      ) : data?.items.length ? (
         <>
           <div className="table-wrap">
             <table>
-              <thead><tr><th scope="col">Kod</th><th scope="col">Ad</th>{kind === "warehouse" && <th scope="col">Raf sayısı</th>}<th scope="col">Durum</th></tr></thead>
-              <tbody>{data.items.map((record) => (
-                <tr key={record.id}>
-                  <td><Anchor href={`${baseHref}/${record.id}`} navigate={navigate}>{record.code}</Anchor></td>
-                  <td>{record.name}</td>
-                  {kind === "warehouse" && <td>{"_count" in record ? record._count?.locations ?? 0 : 0}</td>}
-                  <td><span className={record.isActive ? "status active" : "status inactive"}>{statusLabel(record.isActive)}</span></td>
+              <thead>
+                <tr>
+                  <th scope="col">Kod</th>
+                  <th scope="col">Ad</th>
+                  {kind === "warehouse" && <th scope="col">Raf sayısı</th>}
+                  <th scope="col">Durum</th>
                 </tr>
-              ))}</tbody>
+              </thead>
+              <tbody>
+                {data.items.map((record) => (
+                  <tr key={record.id}>
+                    <td>
+                      <Anchor
+                        href={`${baseHref}/${record.id}`}
+                        navigate={navigate}
+                      >
+                        {record.code}
+                      </Anchor>
+                    </td>
+                    <td>{record.name}</td>
+                    {kind === "warehouse" && (
+                      <td>
+                        {"_count" in record
+                          ? (record._count?.locations ?? 0)
+                          : 0}
+                      </td>
+                    )}
+                    <td>
+                      <span
+                        className={
+                          record.isActive ? "status active" : "status inactive"
+                        }
+                      >
+                        {statusLabel(record.isActive)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
-          <Pagination page={data.page} pageSize={data.pageSize} total={data.total} onPage={setPage} />
+          <Pagination
+            page={data.page}
+            pageSize={data.pageSize}
+            total={data.total}
+            onPage={setPage}
+          />
         </>
-      ) : !error ? <Empty>Kayıt bulunamadı.</Empty> : null}
+      ) : !error ? (
+        <Empty>Kayıt bulunamadı.</Empty>
+      ) : null}
     </>
   );
 }
@@ -986,9 +1342,10 @@ function NamedForm({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (record && record.isActive && !isActive) {
-      const explanation = kind === "warehouse"
-        ? "Depo; pozitif stok, devam eden transfer veya açık sayım varsa pasifleştirilemez. Depo geçmiş kayıtlarla korunur. Devam edilsin mi?"
-        : "Kategori pasif yapılacak. Mevcut ürün ilişkileri korunur; yeni ürünlere atanamaz. Devam edilsin mi?";
+      const explanation =
+        kind === "warehouse"
+          ? "Depo; pozitif stok, devam eden transfer veya açık sayım varsa pasifleştirilemez. Depo geçmiş kayıtlarla korunur. Devam edilsin mi?"
+          : "Kategori pasif yapılacak. Mevcut ürün ilişkileri korunur; yeni ürünlere atanamaz. Devam edilsin mi?";
       if (!window.confirm(explanation)) return;
     }
     setSaving(true);
@@ -1009,7 +1366,9 @@ function NamedForm({
       window.dispatchEvent(new PopStateEvent("popstate"));
       onSuccess(`${title} ${record ? "bilgileri kaydedildi" : "oluşturuldu"}.`);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : `${title} kaydedilemedi.`);
+      setError(
+        cause instanceof Error ? cause.message : `${title} kaydedilemedi.`,
+      );
     } finally {
       setSaving(false);
     }
@@ -1017,15 +1376,50 @@ function NamedForm({
 
   return (
     <section>
-      <PageHeader title={`${record ? "Düzenle" : "Yeni"} ${title.toLocaleLowerCase("tr-TR")}`} />
+      <PageHeader
+        title={`${record ? "Düzenle" : "Yeni"} ${title.toLocaleLowerCase("tr-TR")}`}
+      />
       <form className="data-form" onSubmit={(event) => void submit(event)}>
-        <label>Kod<input required maxLength={48} value={code} onChange={(event) => setCode(event.target.value)} /></label>
-        <label>Ad<input required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} /></label>
-        {record && <label className="checkbox-label"><input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} /> Aktif</label>}
+        <label>
+          Kod
+          <input
+            required
+            maxLength={48}
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+          />
+        </label>
+        <label>
+          Ad
+          <input
+            required
+            maxLength={120}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </label>
+        {record && (
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={isActive}
+              onChange={(event) => setIsActive(event.target.checked)}
+            />{" "}
+            Aktif
+          </label>
+        )}
         {error && <LoadError message={error} />}
         <div className="form-actions">
-          <button className="primary-button" type="submit" disabled={saving}>{saving ? "Kaydediliyor…" : "Kaydet"}</button>
-          <Anchor className="secondary-button link-button" href={record ? `${basePath}/${record.id}` : basePath} navigate={navigate}>Vazgeç</Anchor>
+          <button className="primary-button" type="submit" disabled={saving}>
+            {saving ? "Kaydediliyor…" : "Kaydet"}
+          </button>
+          <Anchor
+            className="secondary-button link-button"
+            href={record ? `${basePath}/${record.id}` : basePath}
+            navigate={navigate}
+          >
+            Vazgeç
+          </Anchor>
         </div>
       </form>
     </section>
@@ -1061,32 +1455,59 @@ function NamedDetail({
         if (!cancelled) setRecord(value);
       })
       .catch((cause: unknown) => {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : "Kayıt yüklenemedi.");
+        if (!cancelled)
+          setError(
+            cause instanceof Error ? cause.message : "Kayıt yüklenemedi.",
+          );
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [endpoint, id, csrfToken]);
   if (loading) return <Loading />;
   if (error) return <LoadError message={error} />;
   if (!record) return <Empty>Kayıt bulunamadı.</Empty>;
   if (editing) {
-    return <NamedForm kind={kind} record={record} navigate={navigate} csrfToken={csrfToken} onSuccess={onSuccess} />;
+    return (
+      <NamedForm
+        kind={kind}
+        record={record}
+        navigate={navigate}
+        csrfToken={csrfToken}
+        onSuccess={onSuccess}
+      />
+    );
   }
   const title = kind === "category" ? "Kategori" : "Depo";
   const basePath = `/${endpoint}`;
   return (
     <section>
-      <PageHeader title={record.name} subtitle={`${title} · ${record.code}`} action={canManage ? (
-        <Anchor className="primary-button link-button" href={`${basePath}/${id}/edit`} navigate={navigate}>Düzenle</Anchor>
-      ) : undefined} />
+      <PageHeader
+        title={record.name}
+        subtitle={`${title} · ${record.code}`}
+        action={
+          canManage ? (
+            <Anchor
+              className="primary-button link-button"
+              href={`${basePath}/${id}/edit`}
+              navigate={navigate}
+            >
+              Düzenle
+            </Anchor>
+          ) : undefined
+        }
+      />
       <dl className="details-grid">
         <Detail label="Kod" value={record.code} />
         <Detail label="Ad" value={record.name} />
         <Detail label="Durum" value={statusLabel(record.isActive)} />
       </dl>
-      <Anchor className="back-link" href={basePath} navigate={navigate}>← {title} listesine dön</Anchor>
+      <Anchor className="back-link" href={basePath} navigate={navigate}>
+        ← {title} listesine dön
+      </Anchor>
     </section>
   );
 }
@@ -1113,26 +1534,60 @@ function WarehouseDetail({
     let cancelled = false;
     setLoading(true);
     api<Warehouse>(`/api/warehouses/${id}`, csrfToken)
-      .then((value) => { if (!cancelled) setWarehouse(value); })
-      .catch((cause: unknown) => { if (!cancelled) setError(cause instanceof Error ? cause.message : "Depo yüklenemedi."); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .then((value) => {
+        if (!cancelled) setWarehouse(value);
+      })
+      .catch((cause: unknown) => {
+        if (!cancelled)
+          setError(
+            cause instanceof Error ? cause.message : "Depo yüklenemedi.",
+          );
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id, csrfToken]);
   if (loading) return <Loading />;
   if (error) return <LoadError message={error} />;
   if (!warehouse) return <Empty>Depo bulunamadı.</Empty>;
-  if (editing) return <NamedForm kind="warehouse" record={warehouse} navigate={navigate} csrfToken={csrfToken} onSuccess={onSuccess} />;
+  if (editing)
+    return (
+      <NamedForm
+        kind="warehouse"
+        record={warehouse}
+        navigate={navigate}
+        csrfToken={csrfToken}
+        onSuccess={onSuccess}
+      />
+    );
   return (
     <section>
       <PageHeader
         title={warehouse.name}
         subtitle={`Depo · ${warehouse.code}`}
-        action={canManage ? (
-          <div className="header-actions">
-            <Anchor className="secondary-button link-button" href={`/warehouses/${id}/locations/new`} navigate={navigate}>Raf ekle</Anchor>
-            <Anchor className="primary-button link-button" href={`/warehouses/${id}/edit`} navigate={navigate}>Düzenle</Anchor>
-          </div>
-        ) : undefined}
+        action={
+          canManage ? (
+            <div className="header-actions">
+              <Anchor
+                className="secondary-button link-button"
+                href={`/warehouses/${id}/locations/new`}
+                navigate={navigate}
+              >
+                Raf ekle
+              </Anchor>
+              <Anchor
+                className="primary-button link-button"
+                href={`/warehouses/${id}/edit`}
+                navigate={navigate}
+              >
+                Düzenle
+              </Anchor>
+            </div>
+          ) : undefined
+        }
       />
       <dl className="details-grid">
         <Detail label="Kod" value={warehouse.code} />
@@ -1140,24 +1595,61 @@ function WarehouseDetail({
       </dl>
       <div className="section-heading-row">
         <h2>Raflar ve konumlar</h2>
-        {canManage && <Anchor className="text-link" href={`/warehouses/${id}/locations/new`} navigate={navigate}>Raf ekle</Anchor>}
+        {canManage && (
+          <Anchor
+            className="text-link"
+            href={`/warehouses/${id}/locations/new`}
+            navigate={navigate}
+          >
+            Raf ekle
+          </Anchor>
+        )}
       </div>
       {warehouse.locations?.length ? (
         <div className="table-wrap">
           <table>
-            <thead><tr><th scope="col">Kod</th><th scope="col">Ad</th><th scope="col">Durum</th></tr></thead>
-            <tbody>{warehouse.locations.map((location) => (
-              <tr key={location.id}>
-                <td><Anchor href={`/warehouses/${id}/locations/${location.id}`} navigate={navigate}>{location.code}</Anchor></td>
-                <td>{location.name}</td>
-                <td><span className={location.isActive ? "status active" : "status inactive"}>{statusLabel(location.isActive)}</span></td>
+            <thead>
+              <tr>
+                <th scope="col">Kod</th>
+                <th scope="col">Ad</th>
+                <th scope="col">Durum</th>
               </tr>
-            ))}</tbody>
+            </thead>
+            <tbody>
+              {warehouse.locations.map((location) => (
+                <tr key={location.id}>
+                  <td>
+                    <Anchor
+                      href={`/warehouses/${id}/locations/${location.id}`}
+                      navigate={navigate}
+                    >
+                      {location.code}
+                    </Anchor>
+                  </td>
+                  <td>{location.name}</td>
+                  <td>
+                    <span
+                      className={
+                        location.isActive ? "status active" : "status inactive"
+                      }
+                    >
+                      {statusLabel(location.isActive)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
           </table>
         </div>
-      ) : <Empty>Bu depoda henüz raf veya konum yok.</Empty>}
-      <p className="help-note">Raflar yerleşim bilgisidir; ayrı stok miktarı tutmaz.</p>
-      <Anchor className="back-link" href="/warehouses" navigate={navigate}>← Depolara dön</Anchor>
+      ) : (
+        <Empty>Bu depoda henüz raf veya konum yok.</Empty>
+      )}
+      <p className="help-note">
+        Raflar yerleşim bilgisidir; ayrı stok miktarı tutmaz.
+      </p>
+      <Anchor className="back-link" href="/warehouses" navigate={navigate}>
+        ← Depolara dön
+      </Anchor>
     </section>
   );
 }
@@ -1182,7 +1674,14 @@ function LocationForm({
   const [saving, setSaving] = useState(false);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (location?.isActive && !isActive && !window.confirm("Raf pasif yapılacak. Raf bilgisi ve geçmiş ilişkiler korunur. Devam edilsin mi?")) return;
+    if (
+      location?.isActive &&
+      !isActive &&
+      !window.confirm(
+        "Raf pasif yapılacak. Raf bilgisi ve geçmiş ilişkiler korunur. Devam edilsin mi?",
+      )
+    )
+      return;
     setSaving(true);
     setError("");
     try {
@@ -1196,7 +1695,9 @@ function LocationForm({
           body: JSON.stringify({
             code,
             name,
-            ...(location ? { isActive, expectedUpdatedAt: location.updatedAt } : {}),
+            ...(location
+              ? { isActive, expectedUpdatedAt: location.updatedAt }
+              : {}),
           }),
         },
       );
@@ -1214,13 +1715,46 @@ function LocationForm({
     <section>
       <PageHeader title={location ? "Rafı düzenle" : "Yeni raf"} />
       <form className="data-form" onSubmit={(event) => void submit(event)}>
-        <label>Raf kodu<input required maxLength={48} value={code} onChange={(event) => setCode(event.target.value)} /></label>
-        <label>Ad<input required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} /></label>
-        {location && <label className="checkbox-label"><input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} /> Aktif</label>}
+        <label>
+          Raf kodu
+          <input
+            required
+            maxLength={48}
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+          />
+        </label>
+        <label>
+          Ad
+          <input
+            required
+            maxLength={120}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </label>
+        {location && (
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={isActive}
+              onChange={(event) => setIsActive(event.target.checked)}
+            />{" "}
+            Aktif
+          </label>
+        )}
         {error && <LoadError message={error} />}
         <div className="form-actions">
-          <button className="primary-button" type="submit" disabled={saving}>{saving ? "Kaydediliyor…" : "Kaydet"}</button>
-          <Anchor className="secondary-button link-button" href={`/warehouses/${warehouseId}`} navigate={navigate}>Vazgeç</Anchor>
+          <button className="primary-button" type="submit" disabled={saving}>
+            {saving ? "Kaydediliyor…" : "Kaydet"}
+          </button>
+          <Anchor
+            className="secondary-button link-button"
+            href={`/warehouses/${warehouseId}`}
+            navigate={navigate}
+          >
+            Vazgeç
+          </Anchor>
         </div>
       </form>
     </section>
@@ -1249,32 +1783,76 @@ function LocationDetail({
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     let cancelled = false;
-    api<Location>(`/api/warehouses/${warehouseId}/locations/${locationId}`, csrfToken)
-      .then((value) => { if (!cancelled) setLocation(value); })
-      .catch((cause: unknown) => { if (!cancelled) setError(cause instanceof Error ? cause.message : "Raf yüklenemedi."); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+    api<Location>(
+      `/api/warehouses/${warehouseId}/locations/${locationId}`,
+      csrfToken,
+    )
+      .then((value) => {
+        if (!cancelled) setLocation(value);
+      })
+      .catch((cause: unknown) => {
+        if (!cancelled)
+          setError(cause instanceof Error ? cause.message : "Raf yüklenemedi.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [warehouseId, locationId, csrfToken]);
   if (loading) return <Loading />;
   if (error) return <LoadError message={error} />;
   if (!location) return <Empty>Raf bulunamadı.</Empty>;
-  if (editing) return <LocationForm warehouseId={warehouseId} location={location} navigate={navigate} csrfToken={csrfToken} onSuccess={onSuccess} />;
+  if (editing)
+    return (
+      <LocationForm
+        warehouseId={warehouseId}
+        location={location}
+        navigate={navigate}
+        csrfToken={csrfToken}
+        onSuccess={onSuccess}
+      />
+    );
   return (
     <section>
-      <PageHeader title={location.name} subtitle={`Raf · ${location.code}`} action={canManage ? (
-        <Anchor className="primary-button link-button" href={`/warehouses/${warehouseId}/locations/${locationId}/edit`} navigate={navigate}>Düzenle</Anchor>
-      ) : undefined} />
+      <PageHeader
+        title={location.name}
+        subtitle={`Raf · ${location.code}`}
+        action={
+          canManage ? (
+            <Anchor
+              className="primary-button link-button"
+              href={`/warehouses/${warehouseId}/locations/${locationId}/edit`}
+              navigate={navigate}
+            >
+              Düzenle
+            </Anchor>
+          ) : undefined
+        }
+      />
       <dl className="details-grid">
         <Detail label="Kod" value={location.code} />
         <Detail label="Durum" value={statusLabel(location.isActive)} />
       </dl>
-      <Anchor className="back-link" href={`/warehouses/${warehouseId}`} navigate={navigate}>← Depoya dön</Anchor>
+      <Anchor
+        className="back-link"
+        href={`/warehouses/${warehouseId}`}
+        navigate={navigate}
+      >
+        ← Depoya dön
+      </Anchor>
     </section>
   );
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
-  return <div className="detail"><dt>{label}</dt><dd>{value}</dd></div>;
+  return (
+    <div className="detail">
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
 }
 
 export default CatalogApp;

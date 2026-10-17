@@ -140,10 +140,7 @@ function setSessionCookie(
   );
 }
 
-function clearSessionCookie(
-  reply: FastifyReply,
-  secureCookies: boolean,
-): void {
+function clearSessionCookie(reply: FastifyReply, secureCookies: boolean): void {
   const secure = secureCookies ? "; Secure" : "";
   reply.header(
     "Set-Cookie",
@@ -204,7 +201,12 @@ export function registerAuthRoutes(
     if (unsafe && path === "/api/auth/login") {
       return;
     }
-    if (!unsafe && !isCatalogRequest && !isStockRequest) {
+    if (
+      !unsafe &&
+      !isCatalogRequest &&
+      !isStockRequest &&
+      !path.startsWith("/api/")
+    ) {
       return;
     }
 
@@ -222,7 +224,9 @@ export function registerAuthRoutes(
     }
   });
 
-  async function readSession(request: FastifyRequest): Promise<SessionContext | null> {
+  async function readSession(
+    request: FastifyRequest,
+  ): Promise<SessionContext | null> {
     const rawToken = parseCookie(request);
     if (!rawToken) {
       return null;
@@ -242,7 +246,10 @@ export function registerAuthRoutes(
     return { session, rawToken };
   }
 
-  function verifyCsrf(request: FastifyRequest, context: SessionContext): boolean {
+  function verifyCsrf(
+    request: FastifyRequest,
+    context: SessionContext,
+  ): boolean {
     const supplied = request.headers["x-csrf-token"];
     const csrfHeader = Array.isArray(supplied) ? supplied[0] : supplied;
     return matchesCsrf(
